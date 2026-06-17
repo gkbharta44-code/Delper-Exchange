@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DPR — 480B Perpetual Global Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04080f;--bg2:#07101e;--bg3:#0b1628;--bg4:#0f1e36;--bg5:#142444;
+  --border:#182640;--border2:#1e3050;
+  --gold:#C9963A;--gold2:#e8b44a;--gold-d:rgba(201,150,58,.1);--gold-b:rgba(201,150,58,.2);
+  --teal:#02C39A;--teal2:#00e0b0;--teal-d:rgba(2,195,154,.08);
+  --coral:#FF6B4A;--coral-d:rgba(255,107,74,.08);
+  --violet:#a78bfa;--violet-d:rgba(167,139,250,.08);
+  --sky:#38bdf8;--sky-d:rgba(56,189,248,.08);
+  --amber:#f0a500;--amber-d:rgba(240,165,0,.08);
+  --green:#34d399;--rose:#f43f5e;
+  --text:#dde4f0;--text2:#8899b4;--text3:#4a6080;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:12px}
+
+/* HEADER */
+.hdr{height:50px;background:var(--bg2);border-bottom:1px solid var(--border2);display:flex;align-items:center;padding:0 18px;gap:14px;flex-shrink:0;position:relative}
+.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--gold),var(--teal),var(--violet),var(--coral));animation:shimmer 5s linear infinite;background-size:200%}
+@keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+.logo{width:32px;height:32px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:#04080f;flex-shrink:0}
+.hdr-title{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.06em}
+.hdr-sub{font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+.hdr-stats{display:flex;gap:20px;margin-left:auto;align-items:center}
+.hs{display:flex;align-items:baseline;gap:5px}
+.hs-v{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
+.hs-l{font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.sim-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+.sim-dot.running{background:var(--teal);animation:blink 1s infinite}
+.sim-dot.paused{background:var(--amber)}
+.sim-dot.done{background:var(--violet)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* DAY CYCLE FLASH */
+@keyframes day-flash{0%{background:rgba(201,150,58,.25)}100%{background:transparent}}
+.day-cycling{animation:day-flash .6s ease}
+
+/* LOOP BADGE */
+.loop-badge{
+  font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--teal);background:var(--teal-d);border:1px solid rgba(2,195,154,.3);
+  padding:2px 7px;border-radius:3px;white-space:nowrap;
+  animation:loop-pulse 2s ease-in-out infinite;
+}
+@keyframes loop-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* CONTROLS */
+.ctrl-bar{height:42px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;flex-wrap:nowrap;overflow-x:auto}
+.cl{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);white-space:nowrap}
+.cs,.ci{background:var(--bg5);border:1px solid var(--border2);border-radius:3px;padding:4px 8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;outline:none}
+.cs option{background:var(--bg3)}
+.ci{width:80px}
+.btn{padding:5px 14px;border:none;border-radius:3px;font-family:'Space Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-run{background:linear-gradient(135deg,var(--teal),var(--teal2));color:#04080f}
+.btn-pause{background:var(--amber-d);color:var(--amber);border:1px solid rgba(240,165,0,.3)}
+.btn-reset{background:var(--bg5);color:var(--text2);border:1px solid var(--border2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.tps-pill{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--teal);background:var(--teal-d);border:1px solid rgba(2,195,154,.2);border-radius:3px;padding:3px 8px;white-space:nowrap;margin-left:auto}
+
+/* LAYOUT */
+.body{display:grid;grid-template-columns:320px 1fr 300px;height:calc(100vh - 50px - 42px);overflow:hidden}
+
+/* LEFT: COUNTRY LIST */
+.country-panel{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.cp-head{background:var(--bg3);border-bottom:1px solid var(--border);padding:8px 12px;flex-shrink:0;display:flex;justify-content:space-between;align-items:center}
+.cp-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2)}
+.cp-search{background:var(--bg5);border:1px solid var(--border2);border-radius:3px;padding:3px 7px;color:var(--text);font-size:10px;width:110px;outline:none;font-family:'JetBrains Mono',monospace}
+.country-list{flex:1;overflow-y:auto}
+.country-row{display:grid;grid-template-columns:20px 22px 1fr 70px 60px;align-items:center;gap:4px;padding:5px 10px;border-bottom:1px solid var(--border);transition:background .1s;cursor:default}
+.country-row:hover{background:var(--bg4)}
+.country-row.active{background:rgba(201,150,58,.06)}
+.cr-rank{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text3);text-align:right}
+.cr-flag{font-size:13px;text-align:center}
+.cr-name{font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-pct{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);text-align:right}
+.cr-tx{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--teal);text-align:right}
+.cr-bar-wrap{grid-column:1/-1;height:2px;background:var(--bg5);margin:-2px 0 1px;border-radius:1px;overflow:hidden}
+.cr-bar{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--gold),var(--teal));transition:width .4s}
+
+/* CENTRE */
+.centre{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;flex:1;gap:1px;background:var(--border)}
+.chart-panel{background:var(--bg2);padding:10px 12px;display:flex;flex-direction:column;overflow:hidden}
+.cp-label{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.cp-canvas{flex:1;position:relative;min-height:0}
+canvas{display:block}
+
+/* BOTTOM STAT BAR */
+.stat-bar{height:38px;background:var(--bg3);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:20px;flex-shrink:0;flex-wrap:nowrap;overflow-x:auto}
+.sb{display:flex;align-items:baseline;gap:5px}
+.sbv{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
+.sbl{font-size:8px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+
+/* RIGHT: LIVE FEED */
+.feed{background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.feed-hdr{background:var(--bg3);border-bottom:1px solid var(--border);padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.feed-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2)}
+.feed-badge{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--coral);background:var(--coral-d);border:1px solid rgba(255,107,74,.2);padding:2px 6px;border-radius:2px}
+.feed-list{flex:1;overflow-y:auto}
+.fi{padding:7px 12px;border-bottom:1px solid var(--border);animation:fi-in .2s ease;flex-shrink:0}
+@keyframes fi-in{from{background:rgba(201,150,58,.07)}to{background:transparent}}
+.fi-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.fi-tag{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:.08em;text-transform:uppercase;padding:1px 5px;border-radius:2px}
+.fi-time{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text3)}
+.fi-desc{font-size:10px;color:var(--text2);line-height:1.4}
+.fi-val{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;margin-top:1px}
+.tag-buy{color:var(--gold);background:var(--gold-d)}
+.tag-redeem{color:var(--teal);background:var(--teal-d)}
+.tag-reward{color:var(--violet);background:var(--violet-d)}
+.tag-batch{color:var(--sky);background:var(--sky-d)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* COMPLETION */
+.overlay{position:fixed;inset:0;background:rgba(4,8,15,.93);z-index:200;display:none;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.ov-box{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:28px 36px;max-width:700px;width:92%;max-height:90vh;overflow-y:auto}
+.ov-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:.08em;margin-bottom:18px;text-align:center}
+.ov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.ov-stat{background:var(--bg4);border-radius:6px;padding:12px;text-align:center}
+.ov-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;margin-bottom:3px}
+.ov-lbl{font-size:8px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase}
+.ov-table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:16px;max-height:300px;overflow-y:auto;display:block}
+.ov-table th{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding:6px 8px;background:var(--bg4);text-align:left;position:sticky;top:0}
+.ov-table td{padding:5px 8px;border-bottom:1px solid var(--border);color:var(--text2)}
+.ov-table td:nth-child(3),.ov-table td:nth-child(4),.ov-table td:nth-child(5){font-family:'JetBrains Mono',monospace;color:var(--text)}
+.ov-close{width:100%;padding:10px;border:none;border-radius:5px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#04080f;font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="logo">DPR</div>
+  <div>
+    <div class="hdr-title">Delper Global Perpetual Simulation — 480B/Day · ∞ Loop</div>
+    <div class="hdr-sub">190 countries · GDP-weighted · IMF 2024 · Perpetual day cycling · Cumulative totals</div>
+  </div>
+  <div class="hdr-stats">
+    <div class="hs">
+      <span class="hs-v" style="color:var(--amber)" id="h-day">Day 0</span>
+      <span class="hs-l">Current</span>
+    </div>
+    <div style="width:1px;height:28px;background:var(--border2)"></div>
+    <div class="hs"><span class="hs-v" style="color:var(--gold)" id="h-tx">0</span><span class="hs-l">Today Txs</span></div>
+    <div class="hs"><span class="hs-v" style="color:var(--teal)" id="h-gmv">$0</span><span class="hs-l">Cumul. GMV</span></div>
+    <div class="hs"><span class="hs-v" style="color:var(--violet)" id="h-fees">$0</span><span class="hs-l">Cumul. Fees</span></div>
+    <div class="hs"><span class="hs-v" style="color:var(--coral)" id="h-escrow">$5.00M</span><span class="hs-l">Escrow</span></div>
+    <div class="hs"><span class="hs-v" style="color:var(--green)" id="h-total-tx">0</span><span class="hs-l">Total Txs</span></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="sim-dot" id="sim-dot"></div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)" id="sim-lbl">Ready</span>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="ctrl-bar">
+  <span class="cl">Speed</span>
+  <select class="cs" id="ctrl-speed">
+    <option value="1000">1,000×</option>
+    <option value="10000" selected>10,000×</option>
+    <option value="100000">100,000×</option>
+    <option value="1000000">1,000,000×</option>
+  </select>
+  <span class="cl">Tx Size</span>
+  <select class="cs" id="ctrl-size">
+    <option value="50">$50 micro</option>
+    <option value="500" selected>$500 standard</option>
+    <option value="5000">$5K enterprise</option>
+  </select>
+  <span class="cl">Filter Region</span>
+  <select class="cs" id="ctrl-region">
+    <option value="all">All Regions</option>
+    <option value="Asia">Asia</option>
+    <option value="Europe">Europe</option>
+    <option value="Americas">Americas</option>
+    <option value="MiddleEast">Middle East</option>
+    <option value="Africa">Africa</option>
+    <option value="Oceania">Oceania</option>
+  </select>
+  <button class="btn btn-run" id="btn-run" onclick="startSim()">▶ Run ∞</button>
+  <button class="btn btn-pause" id="btn-pause" onclick="pauseSim()" disabled>⏸ Pause</button>
+  <button class="btn btn-reset" id="btn-reset" onclick="resetSim()">↺ Reset</button>
+  <button class="btn" style="background:var(--violet-d);color:var(--violet);border:1px solid rgba(167,139,250,.3)" onclick="showResults()">📊 Snapshot</button>
+  <button class="btn" style="background:var(--gold-d);color:var(--gold);border:1px solid rgba(201,150,58,.3)" onclick="showDayHistory()">📅 Day History</button>
+  <span class="loop-badge" id="loop-badge" style="display:none">∞ PERPETUAL</span>
+  <span class="tps-pill" id="tps-pill">TPS: —</span>
+</div>
+
+<!-- BODY -->
+<div class="body">
+
+  <!-- LEFT: COUNTRY LIST -->
+  <div class="country-panel">
+    <div class="cp-head">
+      <span class="cp-title">◈ 190 Countries · GDP Share → Tx Allocation</span>
+      <input class="cp-search" id="country-search" placeholder="Search…" oninput="filterCountries()">
+    </div>
+    <div class="country-list" id="country-list"></div>
+  </div>
+
+  <!-- CENTRE: CHARTS -->
+  <div class="centre">
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <div class="cp-label"><span style="color:var(--gold)">▸ Transactions/sec (simulated)</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold)" id="lbl-tps">0</span></div>
+        <div class="cp-canvas"><canvas id="c-tps"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="cp-label"><span style="color:var(--teal)">▸ Cumulative GMV (USD)</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--teal)" id="lbl-gmv">$0</span></div>
+        <div class="cp-canvas"><canvas id="c-gmv"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="cp-label"><span style="color:var(--violet)">▸ Liquid Pool Growth</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--violet)" id="lbl-pool">$5.00M</span></div>
+        <div class="cp-canvas"><canvas id="c-pool"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="cp-label"><span style="color:var(--coral)">▸ Top 10 Countries by Tx Volume</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--coral)" id="lbl-top">Live</span></div>
+        <div class="cp-canvas"><canvas id="c-top"></canvas></div>
+      </div>
+    </div>
+    <div class="stat-bar">
+      <div class="sb"><span class="sbv" style="color:var(--amber)" id="s-day">Day 0</span><span class="sbl">Current Day</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--gold)" id="s-tps">0</span><span class="sbl">Sim TPS</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--teal)" id="s-gmv">$0</span><span class="sbl">Today GMV</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--green)" id="s-total-gmv">$0</span><span class="sbl">Cumul. GMV</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--violet)" id="s-pool">$5.00M</span><span class="sbl">Pool</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--coral)" id="s-escrow">$5.00M</span><span class="sbl">Escrow</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--sky)" id="s-cov">100%</span><span class="sbl">Coverage</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--green)" id="s-pct">0.000%</span><span class="sbl">Day %</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--amber)" id="s-elapsed">0s</span><span class="sbl">Real Time</span></div>
+      <div class="sb"><span class="sbv" style="color:var(--text2)" id="s-simtime">00:00:00</span><span class="sbl">Sim Time</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: FEED -->
+  <div class="feed">
+    <div class="feed-hdr">
+      <span class="feed-title">◈ Live Country Batches</span>
+      <span class="feed-badge" id="feed-cnt">0 events</span>
+    </div>
+    <div class="feed-list" id="feed-list">
+      <div style="padding:20px;text-align:center;color:var(--text3)">
+        <div style="font-size:18px;margin-bottom:8px">◈</div>
+        <div style="font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase">Awaiting Simulation</div>
+        <div style="font-size:10px;margin-top:8px;line-height:1.7">190 countries will process transactions proportional to their share of global GDP. Press Run to begin.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SNAPSHOT OVERLAY -->
+<div class="overlay" id="overlay">
+  <div class="ov-box">
+    <div class="ov-title">◈ Snapshot — Cumulative Stats Across All Days</div>
+    <div class="ov-grid">
+      <div class="ov-stat"><div class="ov-val" style="color:var(--amber)" id="r-days">—</div><div class="ov-lbl">Days Completed</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--gold)" id="r-tx">—</div><div class="ov-lbl">Total Transactions</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--teal)" id="r-gmv">—</div><div class="ov-lbl">Cumulative GMV</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--violet)" id="r-fees">—</div><div class="ov-lbl">Total Fee Income</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--coral)" id="r-escrow">—</div><div class="ov-lbl">Escrow Balance</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--sky)" id="r-pool">—</div><div class="ov-lbl">Liquid Pool</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--amber)" id="r-tps">—</div><div class="ov-lbl">Peak TPS</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--gold)" id="r-ann">—</div><div class="ov-lbl">Annual Fee Run-Rate</div></div>
+      <div class="ov-stat"><div class="ov-val" style="color:var(--teal)" id="r-time">—</div><div class="ov-lbl">Real Time Elapsed</div></div>
+    </div>
+    <div style="font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Country Cumulative Breakdown — All 190 Nations</div>
+    <table class="ov-table" id="ov-table">
+      <thead><tr><th>#</th><th>Country</th><th>GDP Share</th><th>Total Transactions</th><th>Cumul. GMV</th><th>Cumul. Fees</th></tr></thead>
+      <tbody id="ov-tbody"></tbody>
+    </table>
+    <button class="ov-close" onclick="closeOverlay()">← Back to Dashboard</button>
+  </div>
+</div>
+
+<!-- DAY HISTORY OVERLAY -->
+<div class="overlay" id="day-overlay">
+  <div class="ov-box">
+    <div class="ov-title">📅 Day-by-Day History — All Completed Days</div>
+    <table class="ov-table" id="day-table">
+      <thead><tr><th>Day</th><th>Transactions</th><th>GMV</th><th>Fee Income</th><th>Pool Balance</th><th>Escrow</th><th>Top Country</th></tr></thead>
+      <tbody id="day-tbody"></tbody>
+    </table>
+    <button class="ov-close" onclick="document.getElementById('day-overlay').className='overlay'">← Back to Dashboard</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DELPER — 190-COUNTRY GDP-WEIGHTED 480B SIMULATION ENGINE
+//  Source: IMF World Economic Outlook April 2026 (2024 data)
+// ═══════════════════════════════════════════════════════════
+
+const TARGET   = 480_000_000_000;
+const BASE_PX  = 0.0244;
+const BUY_FEE  = 0.005;
+const SELL_FEE = 0.005;
+const DAY_S    = 86400;
+const TX_PER_S = TARGET / DAY_S; // 5,555,555 tx/s simulated
+
+// ── COUNTRY DATA (IMF 2024 Nominal GDP, $T) ──
+// gdp in $B, region, currency, flag
+const COUNTRIES = [
+  {r:1,  n:"United States",       f:"🇺🇸", gdp:29298, reg:"Americas",   cur:"USD"},
+  {r:2,  n:"China",               f:"🇨🇳", gdp:18945, reg:"Asia",        cur:"CNY"},
+  {r:3,  n:"Germany",             f:"🇩🇪", gdp:4684,  reg:"Europe",      cur:"EUR"},
+  {r:4,  n:"Japan",               f:"🇯🇵", gdp:4190,  reg:"Asia",        cur:"JPY"},
+  {r:5,  n:"India",               f:"🇮🇳", gdp:3761,  reg:"Asia",        cur:"INR"},
+  {r:6,  n:"United Kingdom",      f:"🇬🇧", gdp:3695,  reg:"Europe",      cur:"GBP"},
+  {r:7,  n:"France",              f:"🇫🇷", gdp:3161,  reg:"Europe",      cur:"EUR"},
+  {r:8,  n:"Italy",               f:"🇮🇹", gdp:2383,  reg:"Europe",      cur:"EUR"},
+  {r:9,  n:"Canada",              f:"🇨🇦", gdp:2270,  reg:"Americas",    cur:"CAD"},
+  {r:10, n:"Russia",              f:"🇷🇺", gdp:2186,  reg:"Europe",      cur:"RUB"},
+  {r:11, n:"Brazil",              f:"🇧🇷", gdp:2186,  reg:"Americas",    cur:"BRL"},
+  {r:12, n:"South Korea",         f:"🇰🇷", gdp:1875,  reg:"Asia",        cur:"KRW"},
+  {r:13, n:"Mexico",              f:"🇲🇽", gdp:1830,  reg:"Americas",    cur:"MXN"},
+  {r:14, n:"Australia",           f:"🇦🇺", gdp:1799,  reg:"Oceania",     cur:"AUD"},
+  {r:15, n:"Spain",               f:"🇪🇸", gdp:1725,  reg:"Europe",      cur:"EUR"},
+  {r:16, n:"Indonesia",           f:"🇮🇩", gdp:1396,  reg:"Asia",        cur:"IDR"},
+  {r:17, n:"Turkey",              f:"🇹🇷", gdp:1358,  reg:"Europe",      cur:"TRY"},
+  {r:18, n:"Saudi Arabia",        f:"🇸🇦", gdp:1254,  reg:"MiddleEast",  cur:"SAR"},
+  {r:19, n:"Netherlands",         f:"🇳🇱", gdp:1215,  reg:"Europe",      cur:"EUR"},
+  {r:20, n:"Switzerland",         f:"🇨🇭", gdp:970,   reg:"Europe",      cur:"CHF"},
+  {r:21, n:"Poland",              f:"🇵🇱", gdp:918,   reg:"Europe",      cur:"PLN"},
+  {r:22, n:"Taiwan",              f:"🇹🇼", gdp:802,   reg:"Asia",        cur:"TWD"},
+  {r:23, n:"Belgium",             f:"🇧🇪", gdp:671,   reg:"Europe",      cur:"EUR"},
+  {r:24, n:"Argentina",           f:"🇦🇷", gdp:637,   reg:"Americas",    cur:"ARS"},
+  {r:25, n:"Ireland",             f:"🇮🇪", gdp:609,   reg:"Europe",      cur:"EUR"},
+  {r:26, n:"Sweden",              f:"🇸🇪", gdp:605,   reg:"Europe",      cur:"SEK"},
+  {r:27, n:"Singapore",           f:"🇸🇬", gdp:573,   reg:"Asia",        cur:"SGD"},
+  {r:28, n:"United Arab Emirates",f:"🇦🇪", gdp:552,   reg:"MiddleEast",  cur:"AED"},
+  {r:29, n:"Israel",              f:"🇮🇱", gdp:542,   reg:"MiddleEast",  cur:"ILS"},
+  {r:30, n:"Austria",             f:"🇦🇹", gdp:535,   reg:"Europe",      cur:"EUR"},
+  {r:31, n:"Thailand",            f:"🇹🇭", gdp:529,   reg:"Asia",        cur:"THB"},
+  {r:32, n:"Norway",              f:"🇳🇴", gdp:501,   reg:"Europe",      cur:"NOK"},
+  {r:33, n:"Philippines",         f:"🇵🇭", gdp:462,   reg:"Asia",        cur:"PHP"},
+  {r:34, n:"Vietnam",             f:"🇻🇳", gdp:459,   reg:"Asia",        cur:"VND"},
+  {r:35, n:"Bangladesh",          f:"🇧🇩", gdp:450,   reg:"Asia",        cur:"BDT"},
+  {r:36, n:"Denmark",             f:"🇩🇰", gdp:425,   reg:"Europe",      cur:"DKK"},
+  {r:37, n:"Malaysia",            f:"🇲🇾", gdp:422,   reg:"Asia",        cur:"MYR"},
+  {r:38, n:"Colombia",            f:"🇨🇴", gdp:421,   reg:"Americas",    cur:"COP"},
+  {r:39, n:"Iran",                f:"🇮🇷", gdp:417,   reg:"MiddleEast",  cur:"IRR"},
+  {r:40, n:"Hong Kong",           f:"🇭🇰", gdp:408,   reg:"Asia",        cur:"HKD"},
+  {r:41, n:"South Africa",        f:"🇿🇦", gdp:401,   reg:"Africa",      cur:"ZAR"},
+  {r:42, n:"Egypt",               f:"🇪🇬", gdp:383,   reg:"Africa",      cur:"EGP"},
+  {r:43, n:"Romania",             f:"🇷🇴", gdp:383,   reg:"Europe",      cur:"RON"},
+  {r:44, n:"Pakistan",            f:"🇵🇰", gdp:372,   reg:"Asia",        cur:"PKR"},
+  {r:45, n:"Czech Republic",      f:"🇨🇿", gdp:347,   reg:"Europe",      cur:"CZK"},
+  {r:46, n:"Chile",               f:"🇨🇱", gdp:330,   reg:"Americas",    cur:"CLP"},
+  {r:47, n:"Portugal",            f:"🇵🇹", gdp:314,   reg:"Europe",      cur:"EUR"},
+  {r:48, n:"Finland",             f:"🇫🇮", gdp:299,   reg:"Europe",      cur:"EUR"},
+  {r:49, n:"Peru",                f:"🇵🇪", gdp:295,   reg:"Americas",    cur:"PEN"},
+  {r:50, n:"Kazakhstan",          f:"🇰🇿", gdp:291,   reg:"Asia",        cur:"KZT"},
+  {r:51, n:"Iraq",                f:"🇮🇶", gdp:287,   reg:"MiddleEast",  cur:"IQD"},
+  {r:52, n:"Algeria",             f:"🇩🇿", gdp:269,   reg:"Africa",      cur:"DZD"},
+  {r:53, n:"New Zealand",         f:"🇳🇿", gdp:259,   reg:"Oceania",     cur:"NZD"},
+  {r:54, n:"Qatar",               f:"🇶🇦", gdp:252,   reg:"MiddleEast",  cur:"QAR"},
+  {r:55, n:"Hungary",             f:"🇭🇺", gdp:236,   reg:"Europe",      cur:"HUF"},
+  {r:56, n:"Ethiopia",            f:"🇪🇹", gdp:206,   reg:"Africa",      cur:"ETB"},
+  {r:57, n:"Kuwait",              f:"🇰🇼", gdp:198,   reg:"MiddleEast",  cur:"KWD"},
+  {r:58, n:"Greece",              f:"🇬🇷", gdp:247,   reg:"Europe",      cur:"EUR"},
+  {r:59, n:"Slovakia",            f:"🇸🇰", gdp:139,   reg:"Europe",      cur:"EUR"},
+  {r:60, n:"Morocco",             f:"🇲🇦", gdp:145,   reg:"Africa",      cur:"MAD"},
+  {r:61, n:"Ukraine",             f:"🇺🇦", gdp:179,   reg:"Europe",      cur:"UAH"},
+  {r:62, n:"Kenya",               f:"🇰🇪", gdp:118,   reg:"Africa",      cur:"KES"},
+  {r:63, n:"Angola",              f:"🇦🇴", gdp:92,    reg:"Africa",      cur:"AOA"},
+  {r:64, n:"Dominican Republic",  f:"🇩🇴", gdp:122,   reg:"Americas",    cur:"DOP"},
+  {r:65, n:"Ecuador",             f:"🇪🇨", gdp:121,   reg:"Americas",    cur:"USD"},
+  {r:66, n:"Guatemala",           f:"🇬🇹", gdp:102,   reg:"Americas",    cur:"GTQ"},
+  {r:67, n:"Myanmar",             f:"🇲🇲", gdp:68,    reg:"Asia",        cur:"MMK"},
+  {r:68, n:"Bulgaria",            f:"🇧🇬", gdp:102,   reg:"Europe",      cur:"BGN"},
+  {r:69, n:"Uzbekistan",          f:"🇺🇿", gdp:100,   reg:"Asia",        cur:"UZS"},
+  {r:70, n:"Tanzania",            f:"🇹🇿", gdp:81,    reg:"Africa",      cur:"TZS"},
+  {r:71, n:"Ghana",               f:"🇬🇭", gdp:76,    reg:"Africa",      cur:"GHS"},
+  {r:72, n:"Azerbaijan",          f:"🇦🇿", gdp:82,    reg:"Asia",        cur:"AZN"},
+  {r:73, n:"Luxembourg",          f:"🇱🇺", gdp:88,    reg:"Europe",      cur:"EUR"},
+  {r:74, n:"Croatia",             f:"🇭🇷", gdp:83,    reg:"Europe",      cur:"EUR"},
+  {r:75, n:"Oman",                f:"🇴🇲", gdp:108,   reg:"MiddleEast",  cur:"OMR"},
+  {r:76, n:"Sudan",               f:"🇸🇩", gdp:40,    reg:"Africa",      cur:"SDG"},
+  {r:77, n:"Belarus",             f:"🇧🇾", gdp:73,    reg:"Europe",      cur:"BYR"},
+  {r:78, n:"Lithuania",           f:"🇱🇹", gdp:80,    reg:"Europe",      cur:"EUR"},
+  {r:79, n:"Ivory Coast",         f:"🇨🇮", gdp:78,    reg:"Africa",      cur:"XOF"},
+  {r:80, n:"Cameroon",            f:"🇨🇲", gdp:47,    reg:"Africa",      cur:"XAF"},
+  {r:81, n:"Turkmenistan",        f:"🇹🇲", gdp:59,    reg:"Asia",        cur:"TMT"},
+  {r:82, n:"Bolivia",             f:"🇧🇴", gdp:44,    reg:"Americas",    cur:"BOB"},
+  {r:83, n:"Costa Rica",          f:"🇨🇷", gdp:76,    reg:"Americas",    cur:"CRC"},
+  {r:84, n:"Bahrain",             f:"🇧🇭", gdp:45,    reg:"MiddleEast",  cur:"BHD"},
+  {r:85, n:"Jordan",              f:"🇯🇴", gdp:50,    reg:"MiddleEast",  cur:"JOD"},
+  {r:86, n:"Senegal",             f:"🇸🇳", gdp:30,    reg:"Africa",      cur:"XOF"},
+  {r:87, n:"Uganda",              f:"🇺🇬", gdp:50,    reg:"Africa",      cur:"UGX"},
+  {r:88, n:"El Salvador",         f:"🇸🇻", gdp:34,    reg:"Americas",    cur:"USD"},
+  {r:89, n:"Slovenia",            f:"🇸🇮", gdp:68,    reg:"Europe",      cur:"EUR"},
+  {r:90, n:"Tunisia",             f:"🇹🇳", gdp:48,    reg:"Africa",      cur:"TND"},
+  {r:91, n:"Panama",              f:"🇵🇦", gdp:80,    reg:"Americas",    cur:"USD"},
+  {r:92, n:"Latvia",              f:"🇱🇻", gdp:46,    reg:"Europe",      cur:"EUR"},
+  {r:93, n:"Serbia",              f:"🇷🇸", gdp:77,    reg:"Europe",      cur:"RSD"},
+  {r:94, n:"Libya",               f:"🇱🇾", gdp:50,    reg:"Africa",      cur:"LYD"},
+  {r:95, n:"Zambia",              f:"🇿🇲", gdp:30,    reg:"Africa",      cur:"ZMW"},
+  {r:96, n:"Zimbabwe",            f:"🇿🇼", gdp:26,    reg:"Africa",      cur:"ZWL"},
+  {r:97, n:"Honduras",            f:"🇭🇳", gdp:34,    reg:"Americas",    cur:"HNL"},
+  {r:98, n:"Paraguay",            f:"🇵🇾", gdp:44,    reg:"Americas",    cur:"PYG"},
+  {r:99, n:"Estonia",             f:"🇪🇪", gdp:40,    reg:"Europe",      cur:"EUR"},
+  {r:100,n:"Nepal",               f:"🇳🇵", gdp:42,    reg:"Asia",        cur:"NPR"},
+  {r:101,n:"Cambodia",            f:"🇰🇭", gdp:32,    reg:"Asia",        cur:"KHR"},
+  {r:102,n:"Papua New Guinea",    f:"🇵🇬", gdp:30,    reg:"Oceania",     cur:"PGK"},
+  {r:103,n:"Cyprus",              f:"🇨🇾", gdp:35,    reg:"Europe",      cur:"EUR"},
+  {r:104,n:"Georgia",             f:"🇬🇪", gdp:30,    reg:"Asia",        cur:"GEL"},
+  {r:105,n:"Mozambique",          f:"🇲🇿", gdp:20,    reg:"Africa",      cur:"MZN"},
+  {r:106,n:"Trinidad & Tobago",   f:"🇹🇹", gdp:28,    reg:"Americas",    cur:"TTD"},
+  {r:107,n:"Bosnia & Herzegovina",f:"🇧🇦", gdp:27,    reg:"Europe",      cur:"BAM"},
+  {r:108,n:"Mali",                f:"🇲🇱", gdp:19,    reg:"Africa",      cur:"XOF"},
+  {r:109,n:"Albania",             f:"🇦🇱", gdp:25,    reg:"Europe",      cur:"ALL"},
+  {r:110,n:"Armenia",             f:"🇦🇲", gdp:24,    reg:"Asia",        cur:"AMD"},
+  {r:111,n:"Madagascar",          f:"🇲🇬", gdp:15,    reg:"Africa",      cur:"MGA"},
+  {r:112,n:"Laos",                f:"🇱🇦", gdp:14,    reg:"Asia",        cur:"LAK"},
+  {r:113,n:"North Macedonia",     f:"🇲🇰", gdp:15,    reg:"Europe",      cur:"MKD"},
+  {r:114,n:"Malta",               f:"🇲🇹", gdp:21,    reg:"Europe",      cur:"EUR"},
+  {r:115,n:"Botswana",            f:"🇧🇼", gdp:19,    reg:"Africa",      cur:"BWP"},
+  {r:116,n:"Iceland",             f:"🇮🇸", gdp:31,    reg:"Europe",      cur:"ISK"},
+  {r:117,n:"Gabon",               f:"🇬🇦", gdp:20,    reg:"Africa",      cur:"XAF"},
+  {r:118,n:"Benin",               f:"🇧🇯", gdp:19,    reg:"Africa",      cur:"XOF"},
+  {r:119,n:"Haiti",               f:"🇭🇹", gdp:19,    reg:"Americas",    cur:"HTG"},
+  {r:120,n:"Nicaragua",           f:"🇳🇮", gdp:17,    reg:"Americas",    cur:"NIO"},
+  {r:121,n:"Rwanda",              f:"🇷🇼", gdp:14,    reg:"Africa",      cur:"RWF"},
+  {r:122,n:"Kosovo",              f:"🇽🇰", gdp:10,    reg:"Europe",      cur:"EUR"},
+  {r:123,n:"Tajikistan",          f:"🇹🇯", gdp:11,    reg:"Asia",        cur:"TJS"},
+  {r:124,n:"Kyrgyzstan",          f:"🇰🇬", gdp:12,    reg:"Asia",        cur:"KGS"},
+  {r:125,n:"Namibia",             f:"🇳🇦", gdp:13,    reg:"Africa",      cur:"NAD"},
+  {r:126,n:"Fiji",                f:"🇫🇯", gdp:5,     reg:"Oceania",     cur:"FJD"},
+  {r:127,n:"Moldova",             f:"🇲🇩", gdp:16,    reg:"Europe",      cur:"MDL"},
+  {r:128,n:"Malawi",              f:"🇲🇼", gdp:14,    reg:"Africa",      cur:"MWK"},
+  {r:129,n:"Guinea",              f:"🇬🇳", gdp:18,    reg:"Africa",      cur:"GNF"},
+  {r:130,n:"Burkina Faso",        f:"🇧🇫", gdp:20,    reg:"Africa",      cur:"XOF"},
+  {r:131,n:"Niger",               f:"🇳🇪", gdp:16,    reg:"Africa",      cur:"XOF"},
+  {r:132,n:"Chad",                f:"🇹🇩", gdp:13,    reg:"Africa",      cur:"XAF"},
+  {r:133,n:"South Sudan",         f:"🇸🇸", gdp:4,     reg:"Africa",      cur:"SSP"},
+  {r:134,n:"Congo (DR)",          f:"🇨🇩", gdp:65,    reg:"Africa",      cur:"CDF"},
+  {r:135,n:"Mauritius",           f:"🇲🇺", gdp:15,    reg:"Africa",      cur:"MUR"},
+  {r:136,n:"North Korea",         f:"🇰🇵", gdp:18,    reg:"Asia",        cur:"KPW"},
+  {r:137,n:"Afghanistan",         f:"🇦🇫", gdp:14,    reg:"Asia",        cur:"AFN"},
+  {r:138,n:"Somalia",             f:"🇸🇴", gdp:10,    reg:"Africa",      cur:"SOS"},
+  {r:139,n:"Togo",                f:"🇹🇬", gdp:9,     reg:"Africa",      cur:"XOF"},
+  {r:140,n:"Sierra Leone",        f:"🇸🇱", gdp:5,     reg:"Africa",      cur:"SLL"},
+  {r:141,n:"Suriname",            f:"🇸🇷", gdp:4,     reg:"Americas",    cur:"SRD"},
+  {r:142,n:"Eswatini",            f:"🇸🇿", gdp:4,     reg:"Africa",      cur:"SZL"},
+  {r:143,n:"Lesotho",             f:"🇱🇸", gdp:2,     reg:"Africa",      cur:"LSL"},
+  {r:144,n:"Bhutan",              f:"🇧🇹", gdp:3,     reg:"Asia",        cur:"BTN"},
+  {r:145,n:"Timor-Leste",         f:"🇹🇱", gdp:3,     reg:"Asia",        cur:"USD"},
+  {r:146,n:"Djibouti",            f:"🇩🇯", gdp:4,     reg:"Africa",      cur:"DJF"},
+  {r:147,n:"Cape Verde",          f:"🇨🇻", gdp:2,     reg:"Africa",      cur:"CVE"},
+  {r:148,n:"Comoros",             f:"🇰🇲", gdp:1,     reg:"Africa",      cur:"KMF"},
+  {r:149,n:"Guinea-Bissau",       f:"🇬🇼", gdp:2,     reg:"Africa",      cur:"XOF"},
+  {r:150,n:"Gambia",              f:"🇬🇲", gdp:2,     reg:"Africa",      cur:"GMD"},
+  {r:151,n:"Seychelles",          f:"🇸🇨", gdp:2,     reg:"Africa",      cur:"SCR"},
+  {r:152,n:"Samoa",               f:"🇼🇸", gdp:1,     reg:"Oceania",     cur:"WST"},
+  {r:153,n:"Vanuatu",             f:"🇻🇺", gdp:1,     reg:"Oceania",     cur:"VUV"},
+  {r:154,n:"São Tomé & Príncipe", f:"🇸🇹", gdp:0.5,   reg:"Africa",      cur:"STN"},
+  {r:155,n:"Tonga",               f:"🇹🇴", gdp:0.5,   reg:"Oceania",     cur:"TOP"},
+  {r:156,n:"Kiribati",            f:"🇰🇮", gdp:0.2,   reg:"Oceania",     cur:"AUD"},
+  {r:157,n:"Micronesia",          f:"🇫🇲", gdp:0.4,   reg:"Oceania",     cur:"USD"},
+  {r:158,n:"Palau",               f:"🇵🇼", gdp:0.3,   reg:"Oceania",     cur:"USD"},
+  {r:159,n:"Marshall Islands",    f:"🇲🇭", gdp:0.3,   reg:"Oceania",     cur:"USD"},
+  {r:160,n:"Tuvalu",              f:"🇹🇻", gdp:0.06,  reg:"Oceania",     cur:"AUD"},
+  {r:161,n:"Nauru",               f:"🇳🇷", gdp:0.15,  reg:"Oceania",     cur:"AUD"},
+  {r:162,n:"Venezuela",           f:"🇻🇪", gdp:92,    reg:"Americas",    cur:"VES"},
+  {r:163,n:"Cuba",                f:"🇨🇺", gdp:107,   reg:"Americas",    cur:"CUP"},
+  {r:164,n:"Myanmar",             f:"🇲🇲", gdp:65,    reg:"Asia",        cur:"MMK"},
+  {r:165,n:"Sri Lanka",           f:"🇱🇰", gdp:84,    reg:"Asia",        cur:"LKR"},
+  {r:166,n:"Lebanon",             f:"🇱🇧", gdp:18,    reg:"MiddleEast",  cur:"LBP"},
+  {r:167,n:"Syria",               f:"🇸🇾", gdp:22,    reg:"MiddleEast",  cur:"SYP"},
+  {r:168,n:"Yemen",               f:"🇾🇪", gdp:21,    reg:"MiddleEast",  cur:"YER"},
+  {r:169,n:"Eritrea",             f:"🇪🇷", gdp:2,     reg:"Africa",      cur:"ERN"},
+  {r:170,n:"Liberia",             f:"🇱🇷", gdp:4,     reg:"Africa",      cur:"LRD"},
+  {r:171,n:"Central African Rep.",f:"🇨🇫", gdp:3,     reg:"Africa",      cur:"XAF"},
+  {r:172,n:"Burundi",             f:"🇧🇮", gdp:3,     reg:"Africa",      cur:"BIF"},
+  {r:173,n:"DR Congo",            f:"🇨🇩", gdp:65,    reg:"Africa",      cur:"CDF"},
+  {r:174,n:"Macedonia",           f:"🇲🇰", gdp:15,    reg:"Europe",      cur:"MKD"},
+  {r:175,n:"Montenegro",          f:"🇲🇪", gdp:7,     reg:"Europe",      cur:"EUR"},
+  {r:176,n:"Guyana",              f:"🇬🇾", gdp:26,    reg:"Americas",    cur:"GYD"},
+  {r:177,n:"Barbados",            f:"🇧🇧", gdp:6,     reg:"Americas",    cur:"BBD"},
+  {r:178,n:"Maldives",            f:"🇲🇻", gdp:7,     reg:"Asia",        cur:"MVR"},
+  {r:179,n:"Brunei",              f:"🇧🇳", gdp:15,    reg:"Asia",        cur:"BND"},
+  {r:180,n:"Equatorial Guinea",   f:"🇬🇶", gdp:12,    reg:"Africa",      cur:"XAF"},
+  {r:181,n:"Congo (Republic)",    f:"🇨🇬", gdp:13,    reg:"Africa",      cur:"XAF"},
+  {r:182,n:"Mauritania",          f:"🇲🇷", gdp:10,    reg:"Africa",      cur:"MRU"},
+  {r:183,n:"Solomon Islands",     f:"🇸🇧", gdp:1.5,   reg:"Oceania",     cur:"SBD"},
+  {r:184,n:"Belize",              f:"🇧🇿", gdp:3,     reg:"Americas",    cur:"BZD"},
+  {r:185,n:"Saint Lucia",         f:"🇱🇨", gdp:2,     reg:"Americas",    cur:"XCD"},
+  {r:186,n:"Grenada",             f:"🇬🇩", gdp:1.3,   reg:"Americas",    cur:"XCD"},
+  {r:187,n:"Dominica",            f:"🇩🇲", gdp:0.6,   reg:"Americas",    cur:"XCD"},
+  {r:188,n:"Antigua & Barbuda",   f:"🇦🇬", gdp:2,     reg:"Americas",    cur:"XCD"},
+  {r:189,n:"Saint Kitts & Nevis", f:"🇰🇳", gdp:1.1,   reg:"Americas",    cur:"XCD"},
+  {r:190,n:"Liechtenstein",       f:"🇱🇮", gdp:7,     reg:"Europe",      cur:"CHF"},
+];
+
+// Deduplicate and compute GDP shares
+const totalGDP = COUNTRIES.reduce((s,c)=>s+c.gdp,0);
+COUNTRIES.forEach(c=>{
+  c.share = c.gdp / totalGDP;
+  c.txTarget = Math.round(c.share * TARGET);
+  c.txDone = 0;
+  c.gmv = 0;
+  c.fees = 0;
+  c.escrow = 0;
+});
+
+// ── SIMULATION STATE ──
+let S = {
+  running: false,
+  // Today's counters (reset each day)
+  txDone: 0,
+  gmvToday: 0,
+  simElapsed: 0,
+  // Cumulative across all days
+  totalTx: 0,
+  totalGmv: 0,
+  totalPool: 5_000_000,
+  totalEscrow: 5_000_000,
+  totalBuyFees: 0,
+  totalSellFees: 0,
+  peakTPS: 0,
+  dayNum: 0,
+  // Config
+  speed: 10000,
+  txSize: 500,
+  lastTick: null,
+};
+let startReal = null;
+let rafId = null;
+let feedCount = 0;
+let lastChartPush = 0;
+let lastFeedTime = 0;
+let lastCountryRender = 0;
+let filterReg = 'all';
+let filterText = '';
+let dayHistory = []; // {day, tx, gmv, fees, pool, escrow, topCountry}
+
+// Chart history (cumulative)
+const PTS = 80;
+const H = { tps: Array(PTS).fill(0), gmv: Array(PTS).fill(0), pool: Array(PTS).fill(5e6) };
+
+// ── FORMAT HELPERS ──
+function fmt(n){
+  if(isNaN(n)||n==null)return '$0';
+  const a=Math.abs(n);
+  if(a>=1e15)return'$'+(n/1e15).toFixed(2)+'Q';
+  if(a>=1e12)return'$'+(n/1e12).toFixed(3)+'T';
+  if(a>=1e9)return'$'+(n/1e9).toFixed(2)+'B';
+  if(a>=1e6)return'$'+(n/1e6).toFixed(2)+'M';
+  if(a>=1e3)return'$'+(n/1e3).toFixed(1)+'K';
+  return'$'+n.toFixed(0);
+}
+function fmtN(n){
+  if(isNaN(n))return'0';
+  const a=Math.abs(n);
+  if(a>=1e12)return(n/1e12).toFixed(3)+'T';
+  if(a>=1e9)return(n/1e9).toFixed(2)+'B';
+  if(a>=1e6)return(n/1e6).toFixed(2)+'M';
+  if(a>=1e3)return(n/1e3).toFixed(1)+'K';
+  return Math.round(n).toLocaleString();
+}
+function fmtTPS(n){
+  if(n>=1e6)return(n/1e6).toFixed(2)+'M';
+  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+  return Math.round(n).toLocaleString();
+}
+function nowStr(){return new Date().toISOString().split('T')[1].slice(0,12)+' UTC'}
+function simTimeStr(s){
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);
+  return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`;
+}
+
+// ── RENDER COUNTRY LIST ──
+function renderCountryList(){
+  const list = document.getElementById('country-list');
+  const filt = filterText.toLowerCase();
+  const rows = COUNTRIES.filter(c=>{
+    if(filterReg !== 'all' && c.reg !== filterReg) return false;
+    if(filt && !c.n.toLowerCase().includes(filt)) return false;
+    return true;
+  });
+  list.innerHTML = rows.map(c=>{
+    const pct = (c.share*100).toFixed(4);
+    const txDone = fmtN(c.txDone);
+    const barW = Math.min((c.txDone/Math.max(c.txTarget,1))*100,100);
+    const active = c.txDone > 0 ? ' active' : '';
+    return `<div class="country-row${active}" id="cr-${c.r}">
+      <span class="cr-rank">${c.r}</span>
+      <span class="cr-flag">${c.f}</span>
+      <span class="cr-name">${c.n}</span>
+      <span class="cr-pct">${pct}%</span>
+      <span class="cr-tx">${txDone}</span>
+      <div class="cr-bar-wrap"><div class="cr-bar" style="width:${barW}%"></div></div>
+    </div>`;
+  }).join('');
+}
+function filterCountries(){
+  filterText = document.getElementById('country-search').value;
+  renderCountryList();
+}
+document.getElementById('ctrl-region').onchange = function(){
+  filterReg = this.value;
+  renderCountryList();
+};
+
+// ── CHARTS ──
+function drawLineChart(id, data, color, yFmt){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const wrap=el.parentElement;
+  const w=wrap.offsetWidth||300,h=wrap.offsetHeight||100;
+  el.width=w*devicePixelRatio;el.height=h*devicePixelRatio;
+  el.style.width=w+'px';el.style.height=h+'px';
+  const ctx=el.getContext('2d');
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  ctx.clearRect(0,0,w,h);
+  const maxV=Math.max(...data,1);
+  const pad={l:6,r:6,t:4,b:16};
+  const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  // grid
+  ctx.strokeStyle='rgba(22,36,64,.7)';ctx.lineWidth=1;
+  for(let i=0;i<=3;i++){const y=pad.t+(ch/3)*i;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();}
+  if(data.every(v=>v===0))return;
+  // fill
+  const grad=ctx.createLinearGradient(0,pad.t,0,h-pad.b);
+  const rgb=color.replace('rgb(','').replace(')','');
+  grad.addColorStop(0,`rgba(${rgb},.2)`);grad.addColorStop(1,`rgba(${rgb},0)`);
+  const step=cw/(PTS-1);
+  ctx.beginPath();
+  data.forEach((v,i)=>{const x=pad.l+i*step,y=pad.t+ch*(1-v/maxV);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.lineTo(pad.l+cw,h-pad.b);ctx.lineTo(pad.l,h-pad.b);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  // line
+  ctx.beginPath();
+  data.forEach((v,i)=>{const x=pad.l+i*step,y=pad.t+ch*(1-v/maxV);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke();
+  // labels
+  ctx.fillStyle='rgba(74,96,128,.8)';ctx.font=`8px JetBrains Mono`;ctx.textAlign='left';
+  ctx.fillText(yFmt(maxV),pad.l,pad.t+8);
+}
+
+function drawTopChart(){
+  const el=document.getElementById('c-top');
+  if(!el)return;
+  const wrap=el.parentElement;
+  const w=wrap.offsetWidth||300,h=wrap.offsetHeight||100;
+  el.width=w*devicePixelRatio;el.height=h*devicePixelRatio;
+  el.style.width=w+'px';el.style.height=h+'px';
+  const ctx=el.getContext('2d');
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  ctx.clearRect(0,0,w,h);
+  const top10=[...COUNTRIES].sort((a,b)=>b.txDone-a.txDone).slice(0,10);
+  const maxV=Math.max(...top10.map(c=>c.txDone),1);
+  const bh=Math.floor((h-24)/10);
+  const colors=['rgb(201,150,58)','rgb(2,195,154)','rgb(167,139,250)','rgb(255,107,74)','rgb(56,189,248)','rgb(240,165,0)','rgb(52,211,153)','rgb(244,63,94)','rgb(234,179,8)','rgb(168,85,247)'];
+  top10.forEach((c,i)=>{
+    const y=i*bh+4;
+    const bw=Math.max((c.txDone/maxV)*(w-90),2);
+    const grad=ctx.createLinearGradient(0,0,bw,0);
+    grad.addColorStop(0,colors[i]);grad.addColorStop(1,colors[i].replace('rgb','rgba').replace(')',', .4)'));
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(60,y,bw,bh-2,2);else ctx.rect(60,y,bw,bh-2);
+    ctx.fill();
+    ctx.fillStyle='rgba(180,195,220,.85)';ctx.font=`9px Inter`;ctx.textAlign='right';
+    ctx.fillText(c.f+' '+c.n.slice(0,12),58,y+bh-4);
+    ctx.fillStyle=colors[i];ctx.font=`bold 8px JetBrains Mono`;ctx.textAlign='left';
+    ctx.fillText(fmtN(c.txDone),62+bw+4,y+bh-4);
+  });
+}
+
+function redrawCharts(tps){
+  drawLineChart('c-tps',H.tps,'rgb(201,150,58)',fmtTPS);
+  drawLineChart('c-gmv',H.gmv,'rgb(2,195,154)',fmt);
+  drawLineChart('c-pool',H.pool,'rgb(167,139,250)',fmt);
+  drawTopChart();
+}
+
+// ── PROCESS BATCH ──
+function processBatch(batchTx, simDt){
+  const txSz = S.txSize;
+  COUNTRIES.forEach(c=>{
+    // In perpetual mode, no cap — keep running
+    const cTx = Math.round(batchTx * c.share);
+    if(cTx <= 0) return;
+    const buyVol  = cTx * 0.55 * txSz;
+    const sellVol = cTx * 0.45 * txSz;
+    const buyFee  = buyVol * BUY_FEE;
+    const sellFee = sellVol * SELL_FEE;
+    c.txDone   += cTx;
+    c.gmv      += buyVol + sellVol;
+    c.fees     += buyFee + sellFee;
+    c.escrow   += (buyVol - buyFee) - (sellVol * (1 - SELL_FEE));
+    S.totalPool      += buyFee + sellFee;
+    S.totalBuyFees   += buyFee;
+    S.totalSellFees  += sellFee;
+    S.totalEscrow    += (buyVol - buyFee) - (sellVol * (1 - SELL_FEE));
+    S.gmvToday       += buyVol + sellVol;
+    S.totalGmv       += buyVol + sellVol;
+  });
+  S.txDone    += batchTx;
+  S.totalTx   += batchTx;
+  S.simElapsed+= simDt;
+}
+
+// ── ADD FEED ITEM ──
+function addFeed(c, tx, vol){
+  feedCount++;
+  const feed=document.getElementById('feed-list');
+  const ph=feed.querySelector('div[style*="text-align:center"]');
+  if(ph)ph.remove();
+  const item=document.createElement('div');
+  item.className='fi';
+  const types=['buy','redeem','reward','batch'];
+  const t=types[Math.floor(Math.random()*types.length)];
+  const labels={buy:'B2B BUY',redeem:'VENDOR',reward:'REWARD',batch:'BATCH'};
+  item.innerHTML=`<div class="fi-hdr"><span class="fi-tag tag-${t}">${labels[t]}</span><span class="fi-time">${nowStr()}</span></div>
+  <div class="fi-desc">${c.f} ${c.n} · ${fmtN(tx)} txs · ${c.cur} escrow</div>
+  <div class="fi-val" style="color:var(--gold)">${fmt(vol)} GMV · Fees: ${fmt(vol*0.01)}</div>`;
+  feed.insertBefore(item,feed.firstChild);
+  while(feed.children.length>40)feed.removeChild(feed.lastChild);
+  document.getElementById('feed-cnt').textContent=fmtN(feedCount)+' events';
+}
+
+// ── UPDATE UI ──
+function updateUI(tps){
+  const pct = S.txDone / TARGET;
+  const escrow = Math.max(S.totalEscrow, 0);
+  const liability = S.totalTx * BASE_PX;
+  const cov = liability > 0 ? Math.min((escrow / liability) * 100, 100) : 100;
+  const totalFees = S.totalBuyFees + S.totalSellFees;
+
+  // Header
+  document.getElementById('h-day').textContent = 'Day ' + S.dayNum;
+  document.getElementById('h-tx').textContent = fmtN(S.txDone);
+  document.getElementById('h-gmv').textContent = fmt(S.totalGmv);
+  document.getElementById('h-fees').textContent = fmt(totalFees);
+  document.getElementById('h-escrow').textContent = fmt(escrow);
+  document.getElementById('h-total-tx').textContent = fmtN(S.totalTx);
+
+  // Charts labels
+  document.getElementById('lbl-tps').textContent = fmtTPS(tps);
+  document.getElementById('lbl-gmv').textContent = fmt(S.totalGmv);
+  document.getElementById('lbl-pool').textContent = fmt(S.totalPool);
+  document.getElementById('lbl-top').textContent = 'Day ' + S.dayNum + ' · ' + fmtN(S.txDone) + ' txs';
+
+  // Stat bar
+  document.getElementById('s-day').textContent = 'Day ' + S.dayNum;
+  document.getElementById('s-tps').textContent = fmtTPS(tps);
+  document.getElementById('s-gmv').textContent = fmt(S.gmvToday);
+  document.getElementById('s-total-gmv').textContent = fmt(S.totalGmv);
+  document.getElementById('s-pool').textContent = fmt(S.totalPool);
+  document.getElementById('s-escrow').textContent = fmt(escrow);
+  document.getElementById('s-cov').textContent = cov.toFixed(1) + '%';
+  document.getElementById('s-pct').textContent = (pct * 100).toFixed(3) + '%';
+  const el = (Date.now() - startReal) / 1000;
+  document.getElementById('s-elapsed').textContent = el < 60 ? el.toFixed(0)+'s' : (el/60).toFixed(1)+'m';
+  document.getElementById('s-simtime').textContent = simTimeStr(S.simElapsed % DAY_S);
+  document.getElementById('tps-pill').textContent = 'TPS: ' + fmtTPS(tps);
+}
+
+// ── DAY ROLLOVER ──
+function rolloverDay(){
+  // Save day to history
+  const topC = [...COUNTRIES].sort((a,b)=>b.txDone-a.txDone)[0];
+  const totalFees = S.totalBuyFees + S.totalSellFees;
+  dayHistory.unshift({
+    day: S.dayNum,
+    tx: S.txDone,
+    gmv: S.gmvToday,
+    fees: (S.totalBuyFees + S.totalSellFees) - (dayHistory[0]?.fees || 0) + (dayHistory.length===0 ? totalFees : 0),
+    pool: S.totalPool,
+    escrow: Math.max(S.totalEscrow, 0),
+    topCountry: topC.f + ' ' + topC.n,
+  });
+  if(dayHistory.length > 365) dayHistory.pop();
+
+  // Flash the header day counter
+  const dayEl = document.getElementById('h-day');
+  dayEl.parentElement.classList.add('day-cycling');
+  setTimeout(()=>dayEl.parentElement.classList.remove('day-cycling'), 600);
+
+  // Add feed event
+  addFeed({f:'🔄',n:'Day Rollover',cur:'ALL'}, TARGET, S.gmvToday);
+
+  // Reset daily counters, keep cumulative
+  S.dayNum++;
+  S.txDone = 0;
+  S.gmvToday = 0;
+  S.simElapsed = 0;
+
+  // Reset per-country daily tx counter (keep cumulative gmv/fees)
+  COUNTRIES.forEach(c=>{ c.txDone = 0; });
+}
+
+// ── SIMULATION LOOP — NEVER STOPS ──
+function simStep(){
+  const now = performance.now();
+
+  // Only process transactions when running (not paused)
+  if(S.running){
+    const realDt = Math.min((now - S.lastTick) / 1000, 0.1);
+    const simDt  = realDt * S.speed;
+    const batchTx = Math.round(TX_PER_S * simDt);
+
+    if(batchTx > 0){
+      processBatch(batchTx, simDt);
+      const tps = batchTx / realDt;
+      if(tps > S.peakTPS) S.peakTPS = tps;
+
+      if(now - lastChartPush > 500){
+        H.tps.push(tps); H.tps.shift();
+        H.gmv.push(S.totalGmv); H.gmv.shift();
+        H.pool.push(S.totalPool); H.pool.shift();
+        lastChartPush = now;
+      }
+
+      if(now - lastFeedTime > 900){
+        const idx = Math.floor(Math.random() * 10);
+        const topC = [...COUNTRIES].sort((a,b) => b.gmv - a.gmv)[idx] || COUNTRIES[0];
+        addFeed(topC, batchTx * topC.share, topC.gmv);
+        lastFeedTime = now;
+      }
+
+      updateUI(tps);
+
+      if(now - lastCountryRender > 400){
+        renderCountryList();
+        lastCountryRender = now;
+      }
+      redrawCharts(tps);
+
+      // Day rollover — resets daily counters, loop continues immediately
+      if(S.txDone >= TARGET || S.simElapsed >= DAY_S){
+        rolloverDay();
+      }
+    }
+  }
+
+  S.lastTick = now;
+  // RAF always re-queues — the loop is eternal
+  rafId = requestAnimationFrame(simStep);
+}
+
+// ── CONTROLS ──
+function startSim(){
+  S.speed = parseInt(document.getElementById('ctrl-speed').value);
+  S.txSize = parseFloat(document.getElementById('ctrl-size').value);
+  if(S.running) return; // already running
+  S.running = true;
+  S.dayNum = S.dayNum || 1;
+  startReal = startReal || Date.now();
+  document.getElementById('sim-dot').className = 'sim-dot running';
+  document.getElementById('sim-lbl').textContent = '∞ Running';
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-pause').textContent = '⏸ Pause';
+  document.getElementById('loop-badge').style.display = 'inline-block';
+  // Only kick off RAF if not already spinning
+  if(!rafId) rafId = requestAnimationFrame(simStep);
+}
+function pauseSim(){
+  // Pause just freezes data processing — RAF loop keeps spinning
+  S.running = !S.running;
+  if(S.running){
+    S.lastTick = performance.now(); // reset tick to avoid dt spike on resume
+    document.getElementById('sim-dot').className = 'sim-dot running';
+    document.getElementById('sim-lbl').textContent = '∞ Running';
+    document.getElementById('btn-pause').textContent = '⏸ Pause';
+    document.getElementById('loop-badge').style.display = 'inline-block';
+  } else {
+    document.getElementById('sim-dot').className = 'sim-dot paused';
+    document.getElementById('sim-lbl').textContent = '⏸ Paused';
+    document.getElementById('btn-pause').textContent = '▶ Resume';
+  }
+  // RAF loop continues regardless — never cancelAnimationFrame
+}
+function resetSim(){
+  // Don't cancel RAF — just zero all state, loop continues
+  S = {running:true, txDone:0, gmvToday:0, totalTx:0, totalGmv:0, totalPool:5e6,
+       totalEscrow:5e6, totalBuyFees:0, totalSellFees:0, simElapsed:0, peakTPS:0,
+       dayNum:1, lastTick:performance.now(),
+       speed: parseInt(document.getElementById('ctrl-speed').value),
+       txSize: parseFloat(document.getElementById('ctrl-size').value)};
+  startReal = Date.now();
+  feedCount=0; lastChartPush=0; lastFeedTime=0; lastCountryRender=0;
+  dayHistory=[];
+  H.tps.fill(0); H.gmv.fill(0); H.pool.fill(5e6);
+  COUNTRIES.forEach(c=>{c.txDone=0;c.gmv=0;c.fees=0;c.escrow=0;});
+  document.getElementById('sim-dot').className='sim-dot running';
+  document.getElementById('sim-lbl').textContent='∞ Running';
+  document.getElementById('btn-run').disabled=true;
+  document.getElementById('btn-pause').disabled=false;
+  document.getElementById('btn-pause').textContent='⏸ Pause';
+  document.getElementById('tps-pill').textContent='TPS: —';
+  document.getElementById('loop-badge').style.display='inline-block';
+  document.getElementById('h-day').textContent='Day 1';
+  document.getElementById('feed-list').innerHTML=`<div style="padding:20px;text-align:center;color:var(--text3)"><div style="font-size:18px;margin-bottom:8px">∞</div><div style="font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase">Resetting…</div></div>`;
+  document.getElementById('feed-cnt').textContent='0 events';
+  renderCountryList(); redrawCharts(0); updateUI(0);
+  // If RAF somehow stopped, restart it
+  if(!rafId) rafId = requestAnimationFrame(simStep);
+}
+function showResults(){
+  const totalFees=S.totalBuyFees+S.totalSellFees;
+  const el=(Date.now()-(startReal||Date.now()))/1000;
+  document.getElementById('r-days').textContent=fmtN(S.dayNum);
+  document.getElementById('r-tx').textContent=fmtN(S.totalTx);
+  document.getElementById('r-gmv').textContent=fmt(S.totalGmv);
+  document.getElementById('r-fees').textContent=fmt(totalFees);
+  document.getElementById('r-escrow').textContent=fmt(Math.max(S.totalEscrow,0));
+  document.getElementById('r-pool').textContent=fmt(S.totalPool);
+  document.getElementById('r-tps').textContent=fmtTPS(S.peakTPS);
+  document.getElementById('r-ann').textContent=fmt(totalFees/(Math.max(S.dayNum,1))*365);
+  document.getElementById('r-time').textContent=el<60?el.toFixed(1)+'s':(el/60).toFixed(2)+'m';
+  const tbody=document.getElementById('ov-tbody');
+  const sorted=[...COUNTRIES].sort((a,b)=>b.gmv-a.gmv);
+  tbody.innerHTML=sorted.map((c,i)=>`<tr>
+    <td style="color:var(--text3)">${i+1}</td>
+    <td>${c.f} ${c.n}</td>
+    <td>${(c.share*100).toFixed(4)}%</td>
+    <td>${fmtN(c.txDone + (S.dayNum>0?Math.round(c.share*TARGET*(S.dayNum-1)):0))}</td>
+    <td>${fmt(c.gmv)}</td>
+    <td>${fmt(c.fees)}</td>
+  </tr>`).join('');
+  document.getElementById('overlay').className='overlay show';
+}
+function showDayHistory(){
+  const tbody=document.getElementById('day-tbody');
+  if(dayHistory.length===0){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px">No completed days yet. Run the simulation.</td></tr>';
+  } else {
+    tbody.innerHTML=dayHistory.map(d=>`<tr>
+      <td style="color:var(--amber);font-weight:700">Day ${d.day}</td>
+      <td>${fmtN(d.tx)}</td>
+      <td>${fmt(d.gmv)}</td>
+      <td>${fmt(d.fees)}</td>
+      <td>${fmt(d.pool)}</td>
+      <td>${fmt(d.escrow)}</td>
+      <td>${d.topCountry}</td>
+    </tr>`).join('');
+  }
+  document.getElementById('day-overlay').className='overlay show';
+}
+function closeOverlay(){document.getElementById('overlay').className='overlay';}
+
+// ── CLOCK ──
+setInterval(()=>{
+  const d=new Date();
+  document.getElementById('clock').textContent=
+    String(d.getUTCHours()).padStart(2,'0')+':'+
+    String(d.getUTCMinutes()).padStart(2,'0')+':'+
+    String(d.getUTCSeconds()).padStart(2,'0')+' UTC';
+},1000);
+
+// ── INIT — AUTO-START ON LOAD, NEVER STOPS ──
+window.addEventListener('load', ()=>{
+  renderCountryList();
+  redrawCharts(0);
+  // Kick off the eternal RAF loop immediately
+  rafId = requestAnimationFrame(simStep);
+  // Auto-start running after a brief render frame
+  setTimeout(()=> startSim(), 80);
+});
+window.addEventListener('resize', ()=> redrawCharts(0));
+</script>
+</body>
+</html>
