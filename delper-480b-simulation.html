@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DPR — 480B/Day Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04080f;--bg2:#070d1a;--bg3:#0d1526;--bg4:#111d35;--bg5:#162040;
+  --border:#1a2a42;--border2:#1e3050;
+  --gold:#C9963A;--gold2:#e8b44a;--gold-d:rgba(201,150,58,.1);--gold-b:rgba(201,150,58,.2);
+  --teal:#02C39A;--teal2:#00e0b0;--teal-d:rgba(2,195,154,.08);
+  --coral:#FF6B4A;--coral2:#ff8c6b;--coral-d:rgba(255,107,74,.08);
+  --violet:#a78bfa;--violet-d:rgba(167,139,250,.08);
+  --sky:#38bdf8;--sky-d:rgba(56,189,248,.08);
+  --amber:#f0a500;--amber-d:rgba(240,165,0,.08);
+  --green:#34d399;--green-d:rgba(52,211,153,.08);
+  --rose:#f43f5e;
+  --text:#dde4f0;--text2:#8899b4;--text3:#4a6080;
+}
+html,body{height:100%;margin:0;overflow:hidden}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Inter',sans-serif;font-size:12px;
+  display:flex;flex-direction:column;
+}
+
+/* ── HEADER ── */
+.hdr{
+  background:var(--bg2);border-bottom:1px solid var(--border2);
+  padding:0 20px;height:52px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  position:relative;overflow:hidden;
+}
+.hdr::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,var(--gold),var(--teal),var(--violet),var(--coral));
+  animation:hdr-shimmer 4s linear infinite;background-size:200%;
+}
+@keyframes hdr-shimmer{0%{background-position:0%}100%{background-position:200%}}
+.hdr-left{display:flex;align-items:center;gap:14px}
+.hdr-logo{
+  width:36px;height:36px;border-radius:8px;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:#060a10;
+}
+.hdr-title{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:.08em}
+.hdr-sub{font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-top:2px}
+.hdr-right{display:flex;align-items:center;gap:16px}
+.sim-status{
+  display:flex;align-items:center;gap:7px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+}
+.sim-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+.sim-dot.running{background:var(--teal);animation:blink 1s ease-in-out infinite}
+.sim-dot.paused{background:var(--amber)}
+.sim-dot.complete{background:var(--violet)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.sim-label{color:var(--text2);letter-spacing:.08em;text-transform:uppercase}
+.hdr-clock{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+
+/* ── SIM CONTROLS ── */
+.controls{
+  background:var(--bg3);border-bottom:1px solid var(--border);
+  padding:8px 20px;flex-shrink:0;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.ctrl-group{display:flex;align-items:center;gap:8px}
+.ctrl-label{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--text3);
+  white-space:nowrap;
+}
+.ctrl-select,.ctrl-input{
+  background:var(--bg5);border:1px solid var(--border2);
+  border-radius:4px;padding:5px 10px;
+  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;
+  outline:none;transition:border-color .15s;
+}
+.ctrl-select:focus,.ctrl-input:focus{border-color:var(--gold)}
+.ctrl-select option{background:var(--bg3)}
+.ctrl-input{width:90px}
+.btn-ctrl{
+  padding:6px 16px;border:none;border-radius:4px;
+  font-family:'Space Mono',monospace;font-size:9px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.btn-run{background:linear-gradient(135deg,var(--teal),var(--teal2));color:#04080f}
+.btn-run:hover{filter:brightness(1.1)}
+.btn-pause{background:var(--amber-d);color:var(--amber);border:1px solid rgba(240,165,0,.3)}
+.btn-pause:hover{background:rgba(240,165,0,.15)}
+.btn-reset{background:var(--bg5);color:var(--text2);border:1px solid var(--border2)}
+.btn-reset:hover{border-color:var(--coral);color:var(--coral)}
+.btn-ctrl:disabled{opacity:.4;cursor:not-allowed}
+.speed-badge{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--teal);background:var(--teal-d);
+  border:1px solid rgba(2,195,154,.2);border-radius:3px;
+  padding:3px 8px;white-space:nowrap;
+}
+
+/* ── MAIN LAYOUT ── */
+.main{
+  flex:1;overflow:hidden;
+  display:grid;
+  grid-template-columns:260px 1fr 300px;
+  grid-template-rows:1fr;
+}
+
+/* ── LEFT SIDEBAR ── */
+.sidebar{
+  background:var(--bg2);border-right:1px solid var(--border);
+  overflow-y:auto;display:flex;flex-direction:column;
+}
+.sb-section{padding:12px 14px;border-bottom:1px solid var(--border)}
+.sb-title{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--text3);
+  margin-bottom:10px;display:flex;align-items:center;gap:8px;
+}
+.sb-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── BIG COUNTER ── */
+.big-counter{
+  text-align:center;padding:16px 0 10px;
+}
+.bc-val{
+  font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;
+  color:var(--gold);line-height:1;letter-spacing:-.02em;
+  transition:color .3s;
+}
+.bc-lbl{font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-top:5px}
+.bc-sub{font-size:10px;color:var(--text2);margin-top:3px;font-family:'JetBrains Mono',monospace}
+
+/* ── PROGRESS ── */
+.prog-wrap{margin:6px 0}
+.prog-hdr{display:flex;justify-content:space-between;margin-bottom:4px}
+.prog-lbl{font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;font-family:'Space Mono',monospace}
+.prog-val{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text2)}
+.prog-track{height:5px;background:var(--bg5);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:width .3s}
+.pf-gold{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.pf-teal{background:linear-gradient(90deg,var(--teal),var(--teal2))}
+.pf-violet{background:linear-gradient(90deg,var(--violet),#c4b5fd)}
+.pf-coral{background:linear-gradient(90deg,var(--coral),var(--coral2))}
+.pf-sky{background:linear-gradient(90deg,var(--sky),#7dd3fc)}
+
+/* ── DATA ROW ── */
+.dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
+.dr:last-child{border-bottom:none}
+.dr-k{font-size:10px;color:var(--text2)}
+.dr-v{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500}
+.c-gold{color:var(--gold)}.c-teal{color:var(--teal)}.c-coral{color:var(--coral)}
+.c-violet{color:var(--violet)}.c-sky{color:var(--sky)}.c-amber{color:var(--amber)}.c-green{color:var(--green)}
+
+/* ── JURIS ROWS ── */
+.juris-row{
+  display:flex;align-items:center;gap:8px;padding:5px 0;
+  border-bottom:1px solid var(--border);
+}
+.juris-row:last-child{border-bottom:none}
+.jr-flag{font-size:12px;flex-shrink:0}
+.jr-cur{font-family:'Space Mono',monospace;font-size:9px;color:var(--text2);width:30px;flex-shrink:0}
+.jr-bar-wrap{flex:1;height:4px;background:var(--bg5);border-radius:2px;overflow:hidden}
+.jr-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--teal),var(--teal2));transition:width .4s}
+.jr-val{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);width:60px;text-align:right;flex-shrink:0}
+
+/* ── CENTRE: CHARTS ── */
+.centre{
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  overflow:hidden;
+  background:var(--bg);
+}
+.chart-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr;
+  gap:1px;background:var(--border);
+  flex:1;overflow:hidden;
+}
+.chart-panel{
+  background:var(--bg2);
+  display:flex;flex-direction:column;
+  overflow:hidden;padding:12px 14px;
+}
+.cp-title{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;
+}
+.cp-canvas-wrap{flex:1;position:relative;min-height:0}
+canvas{width:100%!important;height:100%!important}
+
+/* ── SIMULATION LOG / TPS DISPLAY ── */
+.sim-bar{
+  background:var(--bg3);border-top:1px solid var(--border);
+  padding:8px 16px;flex-shrink:0;
+  display:flex;align-items:center;gap:24px;flex-wrap:wrap;
+}
+.sb-metric{display:flex;align-items:baseline;gap:6px}
+.sbm-val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700}
+.sbm-lbl{font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase}
+
+/* ── RIGHT: TX FEED ── */
+.feed-panel{
+  background:var(--bg2);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.feed-header{
+  background:var(--bg3);border-bottom:1px solid var(--border);
+  padding:10px 14px;flex-shrink:0;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.feed-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2)}
+.feed-badge{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  color:var(--coral);background:var(--coral-d);border:1px solid rgba(255,107,74,.2);
+  padding:2px 7px;border-radius:3px;
+}
+.feed-list{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.feed-item{
+  padding:8px 14px;border-bottom:1px solid var(--border);
+  flex-shrink:0;animation:fi-in .15s ease;
+}
+@keyframes fi-in{from{opacity:0;background:rgba(201,150,58,.08)}to{opacity:1;background:transparent}}
+.fi-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.fi-type{
+  font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;
+  padding:1px 5px;border-radius:2px;
+}
+.fi-buy{color:var(--gold);background:var(--gold-d)}
+.fi-redeem{color:var(--teal);background:var(--teal-d)}
+.fi-reward{color:var(--violet);background:var(--violet-d)}
+.fi-batch{color:var(--sky);background:var(--sky-d)}
+.fi-time{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text3)}
+.fi-desc{font-size:10px;color:var(--text2);line-height:1.4}
+.fi-val{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;margin-top:2px}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── COMPLETION OVERLAY ── */
+.complete-overlay{
+  position:fixed;inset:0;background:rgba(4,8,15,.92);
+  z-index:200;display:none;align-items:center;justify-content:center;flex-direction:column;
+  gap:0;
+}
+.complete-overlay.show{display:flex}
+.co-box{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:12px;
+  padding:32px 40px;max-width:600px;width:90%;text-align:center;
+}
+.co-title{
+  font-family:'Space Mono',monospace;font-size:14px;font-weight:700;
+  color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:20px;
+}
+.co-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.co-stat{background:var(--bg4);border-radius:6px;padding:14px}
+.co-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;margin-bottom:4px}
+.co-lbl{font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase}
+.co-btn{
+  padding:10px 28px;border:none;border-radius:6px;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#04080f;font-family:'Space Mono',monospace;
+  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;transition:all .18s;
+}
+.co-btn:hover{filter:brightness(1.1)}
+
+/* ── NODE MAP ── */
+.node-map{
+  position:relative;height:100%;display:flex;align-items:center;justify-content:center;
+}
+.node{
+  position:absolute;width:10px;height:10px;border-radius:50%;
+  transition:opacity .3s,transform .1s;
+}
+.node.active{animation:node-pulse .3s ease}
+@keyframes node-pulse{0%{transform:scale(1)}50%{transform:scale(2);opacity:.6}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-logo">DPR</div>
+    <div>
+      <div class="hdr-title">Delper Token Exchange — Volume Simulation</div>
+      <div class="hdr-sub">480 Billion Transactions · Full Ecosystem Throughput · All 5 Jurisdictions</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="sim-status">
+      <div class="sim-dot" id="sim-dot"></div>
+      <span class="sim-label" id="sim-label">Ready</span>
+    </div>
+    <div class="hdr-clock" id="clock">--:--:-- UTC</div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label">Speed</span>
+    <select class="ctrl-select" id="ctrl-speed">
+      <option value="1">1× Real-time</option>
+      <option value="100">100× Accelerated</option>
+      <option value="1000">1,000× Ultra</option>
+      <option value="10000" selected>10,000× Hyper</option>
+      <option value="100000">100,000× Max</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Mix</span>
+    <select class="ctrl-select" id="ctrl-mix">
+      <option value="b2b">B2B Heavy (70/30)</option>
+      <option value="balanced" selected>Balanced (50/50)</option>
+      <option value="consumer">Consumer Heavy (30/70)</option>
+      <option value="reward">Reward Surge (20/80)</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Avg Tx Size</span>
+    <select class="ctrl-select" id="ctrl-txsize">
+      <option value="50">$50 (micro)</option>
+      <option value="500" selected>$500 (standard)</option>
+      <option value="5000">$5,000 (mid)</option>
+      <option value="50000">$50,000 (enterprise)</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Users</span>
+    <input class="ctrl-input" type="number" id="ctrl-users" value="6000000000" min="1000">
+  </div>
+  <button class="btn-ctrl btn-run" id="btn-run" onclick="startSim()">▶ Run Simulation</button>
+  <button class="btn-ctrl btn-pause" id="btn-pause" onclick="pauseSim()" disabled>⏸ Pause</button>
+  <button class="btn-ctrl btn-reset" id="btn-reset" onclick="resetSim()">↺ Reset</button>
+  <div class="speed-badge" id="tps-live">TPS: —</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="sb-section">
+      <div class="sb-title">Daily Progress</div>
+      <div class="big-counter">
+        <div class="bc-val" id="bc-txcount">0</div>
+        <div class="bc-lbl">Transactions Processed</div>
+        <div class="bc-sub" id="bc-pct">0.0000% of 480B target</div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-hdr"><span class="prog-lbl">Day Progress</span><span class="prog-val" id="day-pct">0%</span></div>
+        <div class="prog-track"><div class="prog-fill pf-gold" id="bar-day" style="width:0%"></div></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-hdr"><span class="prog-lbl">Sim Time</span><span class="prog-val" id="sim-time-val">00:00:00</span></div>
+        <div class="prog-track"><div class="prog-fill pf-teal" id="bar-simtime" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-title">Token Economy</div>
+      <div class="prog-wrap">
+        <div class="prog-hdr"><span class="prog-lbl">Circulating Supply</span><span class="prog-val" id="sb-circ-val">0B</span></div>
+        <div class="prog-track"><div class="prog-fill pf-gold" id="sb-circ-bar" style="width:0%"></div></div>
+      </div>
+      <div class="dr"><span class="dr-k">Base Price</span><span class="dr-v c-gold">$0.0244</span></div>
+      <div class="dr"><span class="dr-k">Total Token Liability</span><span class="dr-v c-coral" id="sb-liability">$0</span></div>
+      <div class="dr"><span class="dr-k">Tokens Transacted Today</span><span class="dr-v c-teal" id="sb-tokens-txd">0</span></div>
+      <div class="dr"><span class="dr-k">Avg Tokens/Tx</span><span class="dr-v" id="sb-avg-tokens">0</span></div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-title">Escrow & Pool</div>
+      <div class="dr"><span class="dr-k">Total Escrow</span><span class="dr-v c-teal" id="sb-escrow">$5.00M</span></div>
+      <div class="dr"><span class="dr-k">Coverage Ratio</span><span class="dr-v c-green" id="sb-coverage">100%</span></div>
+      <div class="dr"><span class="dr-k">Liquid Pool</span><span class="dr-v c-violet" id="sb-pool">$5.00M</span></div>
+      <div class="dr"><span class="dr-k">Buy Fees (0.5%)</span><span class="dr-v c-gold" id="sb-buy-fees">$0</span></div>
+      <div class="dr"><span class="dr-k">Sell Fees (0.5%)</span><span class="dr-v c-gold" id="sb-sell-fees">$0</span></div>
+      <div class="dr"><span class="dr-k">Total Fee Income</span><span class="dr-v c-gold" id="sb-total-fees">$0</span></div>
+      <div class="dr"><span class="dr-k">Ad Revenue</span><span class="dr-v c-violet" id="sb-ad-rev">$0</span></div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-title">Jurisdictions</div>
+      <div id="juris-list"></div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-title">User Activity</div>
+      <div class="dr"><span class="dr-k">🏭 B2B Active</span><span class="dr-v c-gold" id="sb-b2b">0</span></div>
+      <div class="dr"><span class="dr-k">👤 Reward Consumers</span><span class="dr-v c-violet" id="sb-reward">0</span></div>
+      <div class="dr"><span class="dr-k">🛒 External Buyers</span><span class="dr-v c-sky" id="sb-external">0</span></div>
+      <div class="dr"><span class="dr-k">Total Onboarded</span><span class="dr-v c-teal" id="sb-total-users">0</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTRE: CHARTS -->
+  <div class="centre">
+    <div class="chart-grid">
+
+      <!-- Chart 1: TPS over time -->
+      <div class="chart-panel">
+        <div class="cp-title">
+          <span style="color:var(--gold)">▸ Transactions Per Second</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold)" id="cur-tps">0 TPS</span>
+        </div>
+        <div class="cp-canvas-wrap"><canvas id="chart-tps"></canvas></div>
+      </div>
+
+      <!-- Chart 2: Cumulative volume -->
+      <div class="chart-panel">
+        <div class="cp-title">
+          <span style="color:var(--teal)">▸ Cumulative GMV (USD)</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--teal)" id="cur-gmv">$0</span>
+        </div>
+        <div class="cp-canvas-wrap"><canvas id="chart-gmv"></canvas></div>
+      </div>
+
+      <!-- Chart 3: Pool & Escrow growth -->
+      <div class="chart-panel">
+        <div class="cp-title">
+          <span style="color:var(--violet)">▸ Pool & Escrow Balance</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--violet)" id="cur-pool">$5.00M</span>
+        </div>
+        <div class="cp-canvas-wrap"><canvas id="chart-pool"></canvas></div>
+      </div>
+
+      <!-- Chart 4: Tx type mix -->
+      <div class="chart-panel">
+        <div class="cp-title">
+          <span style="color:var(--coral)">▸ Transaction Type Distribution</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--coral)" id="cur-mix">—</span>
+        </div>
+        <div class="cp-canvas-wrap"><canvas id="chart-mix"></canvas></div>
+      </div>
+
+    </div>
+
+    <!-- Bottom stats bar -->
+    <div class="sim-bar">
+      <div class="sb-metric">
+        <span class="sbm-val c-gold" id="stat-tps">0</span>
+        <span class="sbm-lbl">Current TPS</span>
+      </div>
+      <div class="sb-metric">
+        <span class="sbm-val c-teal" id="stat-gmv">$0</span>
+        <span class="sbm-lbl">Total GMV</span>
+      </div>
+      <div class="sb-metric">
+        <span class="sbm-val c-violet" id="stat-fees">$0</span>
+        <span class="sbm-lbl">Fee Income</span>
+      </div>
+      <div class="sb-metric">
+        <span class="sbm-val c-coral" id="stat-escrow">$5.00M</span>
+        <span class="sbm-lbl">Escrow Total</span>
+      </div>
+      <div class="sb-metric">
+        <span class="sbm-val c-sky" id="stat-users">0</span>
+        <span class="sbm-lbl">Active Users</span>
+      </div>
+      <div class="sb-metric">
+        <span class="sbm-val c-green" id="stat-coverage">100%</span>
+        <span class="sbm-lbl">Coverage</span>
+      </div>
+      <div class="sb-metric">
+        <span class="sbm-val" style="color:var(--amber)" id="stat-elapsed">0s</span>
+        <span class="sbm-lbl">Real Time</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: FEED -->
+  <div class="feed-panel">
+    <div class="feed-header">
+      <span class="feed-title">◈ Live Transaction Batches</span>
+      <span class="feed-badge" id="feed-badge">0 batches</span>
+    </div>
+    <div class="feed-list" id="feed-list">
+      <div style="padding:24px 14px;text-align:center;color:var(--text3)">
+        <div style="font-size:20px;margin-bottom:8px">◈</div>
+        <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase">Awaiting Simulation</div>
+        <div style="font-size:10px;margin-top:8px;line-height:1.6">Configure parameters above and press Run to begin the 480B transaction simulation across all 5 jurisdictions.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- COMPLETION OVERLAY -->
+<div class="complete-overlay" id="completeOverlay">
+  <div class="co-box">
+    <div class="co-title">◈ Simulation Complete — Day Processed</div>
+    <div class="co-grid">
+      <div class="co-stat">
+        <div class="co-val c-gold" id="res-txcount">—</div>
+        <div class="co-lbl">Transactions</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-teal" id="res-gmv">—</div>
+        <div class="co-lbl">Total GMV</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-violet" id="res-fees">—</div>
+        <div class="co-lbl">Fee Income</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-coral" id="res-escrow">—</div>
+        <div class="co-lbl">Escrow Balance</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-green" id="res-pool">—</div>
+        <div class="co-lbl">Liquid Pool</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-sky" id="res-users">—</div>
+        <div class="co-lbl">Active Users</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val" style="color:var(--amber)" id="res-tps">—</div>
+        <div class="co-lbl">Peak TPS</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-gold" id="res-annfee">—</div>
+        <div class="co-lbl">Ann. Fee Run-Rate</div>
+      </div>
+      <div class="co-stat">
+        <div class="co-val c-teal" id="res-coverage">—</div>
+        <div class="co-lbl">Final Coverage</div>
+      </div>
+    </div>
+    <button class="co-btn" onclick="closeResults()">← Back to Dashboard</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  DELPER 480B TRANSACTION SIMULATION ENGINE
+// ════════════════════════════════════════════════
+
+const TARGET_TX   = 480_000_000_000;
+const BASE_PRICE  = 0.0244;
+const CIRC_CAP    = 480_000_000_000;
+const BUY_FEE     = 0.005;
+const SELL_FEE    = 0.005;
+const DAY_SECS    = 86400;
+const REWARD_AMT  = 83.33;
+const REWARD_TOKS = Math.floor(REWARD_AMT / BASE_PRICE);
+
+const CURRENCIES  = ['USD','EUR','SGD','JPY','AED'];
+const FLAGS       = {USD:'🇺🇸',EUR:'🇪🇺',SGD:'🇸🇬',JPY:'🇯🇵',AED:'🇦🇪'};
+const FX          = {USD:1,EUR:1.08,SGD:0.74,JPY:0.0067,AED:0.272};
+const CUR_SHARE   = {USD:.35,EUR:.25,SGD:.20,JPY:.12,AED:.08};
+
+// Simulation state
+let S = null;
+let simTimer = null;
+let rafId = null;
+let startReal = null;
+let batchCount = 0;
+let feedItems = 0;
+
+// Chart data
+const CHART_POINTS = 80;
+let chartData = {
+  tps:   Array(CHART_POINTS).fill(0),
+  gmv:   Array(CHART_POINTS).fill(0),
+  pool:  Array(CHART_POINTS).fill(5_000_000),
+  escrow:Array(CHART_POINTS).fill(5_000_000),
+  buy:   0, redeem: 0, reward: 0,
+};
+
+// ── UTILS ──
+function fmt(n){
+  if(n===undefined||n===null||isNaN(n)) return '$0';
+  const a = Math.abs(n);
+  if(a>=1e15) return '$'+(n/1e15).toFixed(2)+'Q';
+  if(a>=1e12) return '$'+(n/1e12).toFixed(3)+'T';
+  if(a>=1e9)  return '$'+(n/1e9).toFixed(2)+'B';
+  if(a>=1e6)  return '$'+(n/1e6).toFixed(2)+'M';
+  if(a>=1e3)  return '$'+(n/1e3).toFixed(1)+'K';
+  return '$'+n.toFixed(2);
+}
+function fmtN(n){
+  if(n===undefined||isNaN(n)) return '0';
+  const a = Math.abs(n);
+  if(a>=1e12) return (n/1e12).toFixed(3)+'T';
+  if(a>=1e9)  return (n/1e9).toFixed(2)+'B';
+  if(a>=1e6)  return (n/1e6).toFixed(2)+'M';
+  if(a>=1e3)  return (n/1e3).toFixed(1)+'K';
+  return Math.round(n).toLocaleString();
+}
+function fmtTPS(n){
+  if(n>=1e6) return (n/1e6).toFixed(2)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(1)+'K';
+  return Math.round(n).toLocaleString();
+}
+function randRange(min,max){ return min + Math.random()*(max-min); }
+function pickCurrency(){
+  const r = Math.random();
+  let acc = 0;
+  for(const [c,sh] of Object.entries(CUR_SHARE)){
+    acc += sh;
+    if(r < acc) return c;
+  }
+  return 'USD';
+}
+function nowStr(){
+  return new Date().toISOString().split('T')[1].slice(0,12)+' UTC';
+}
+function simTimeStr(secs){
+  const h = Math.floor(secs/3600);
+  const m = Math.floor((secs%3600)/60);
+  const s = Math.floor(secs%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ── INIT STATE ──
+function initState(){
+  const speed  = parseInt(document.getElementById('ctrl-speed').value);
+  const mix    = document.getElementById('ctrl-mix').value;
+  const txSize = parseFloat(document.getElementById('ctrl-txsize').value);
+  const users  = parseInt(document.getElementById('ctrl-users').value) || 1_000_000;
+
+  // Mix ratios: [b2b_buy, b2b_redeem, consumer_buy, reward]
+  const mixes = {
+    b2b:      {b2b_buy:.40,b2b_red:.30,con_buy:.15,reward:.15},
+    balanced: {b2b_buy:.30,b2b_red:.25,con_buy:.20,reward:.25},
+    consumer: {b2b_buy:.20,b2b_red:.15,con_buy:.30,reward:.35},
+    reward:   {b2b_buy:.15,b2b_red:.10,con_buy:.15,reward:.60},
+  };
+
+  return {
+    speed, mix, txSize, totalUsers: users,
+    mixRatios: mixes[mix],
+    // Counters
+    txCount: 0,
+    gmv: 0,
+    escrow: {USD:5_000_000,EUR:0,SGD:0,JPY:0,AED:0},
+    pool: 5_000_000,
+    buyFees: 0,
+    sellFees: 0,
+    adRevenue: 0,
+    tokensCirculating: 0,
+    tokensTxd: 0,
+    users: {b2b: Math.floor(users*0.1), reward: Math.floor(users*0.6), external: Math.floor(users*0.3)},
+    // Sim time tracking
+    simElapsed: 0,   // simulated seconds elapsed
+    simRunning: false,
+    peakTPS: 0,
+    lastTick: null,
+    lastTxCount: 0,
+    // Batch processing
+    txPerSecSim: TARGET_TX / DAY_SECS,  // 5.555M tx/s simulated
+  };
+}
+
+// ── CHARTS ──
+let charts = {};
+
+function initCharts(){
+  const labels = Array.from({length:CHART_POINTS},(_,i)=>i);
+
+  function makeChart(id, label, color, fill, yFmt){
+    const ctx = document.getElementById(id).getContext('2d');
+    const data = chartData[id.replace('chart-','')];
+    return {
+      ctx, data,
+      label, color, fill,
+      draw: function(){
+        const el = document.getElementById(id);
+        const w = el.parentElement.offsetWidth;
+        const h = el.parentElement.offsetHeight;
+        el.width = w * devicePixelRatio;
+        el.height = h * devicePixelRatio;
+        el.style.width = w+'px';
+        el.style.height = h+'px';
+        const ctx = this.ctx;
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        ctx.clearRect(0,0,w,h);
+
+        const d = this.data;
+        const maxV = Math.max(...d, 1);
+        const pad = {l:8,r:8,t:6,b:20};
+        const cw = w - pad.l - pad.r;
+        const ch = h - pad.t - pad.b;
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(30,45,70,.5)';
+        ctx.lineWidth = 1;
+        for(let i=0;i<=4;i++){
+          const y = pad.t + (ch/4)*i;
+          ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();
+          if(i===0||i===2||i===4){
+            ctx.fillStyle='rgba(100,115,130,.5)';ctx.font='8px JetBrains Mono';
+            ctx.fillText(yFmt(maxV*(1-i/4)),pad.l,y-2);
+          }
+        }
+
+        if(d.every(v=>v===0)){return;}
+
+        // Area fill
+        const grad = ctx.createLinearGradient(0,pad.t,0,h-pad.b);
+        grad.addColorStop(0,this.color.replace(')',', .25)').replace('rgb','rgba'));
+        grad.addColorStop(1,this.color.replace(')',', 0)').replace('rgb','rgba'));
+
+        ctx.beginPath();
+        const step = cw/(CHART_POINTS-1);
+        d.forEach((v,i)=>{
+          const x = pad.l + i*step;
+          const y = pad.t + ch*(1-v/maxV);
+          i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+        });
+        ctx.lineTo(pad.l+cw,h-pad.b);ctx.lineTo(pad.l,h-pad.b);ctx.closePath();
+        ctx.fillStyle=grad;ctx.fill();
+
+        // Line
+        ctx.beginPath();
+        d.forEach((v,i)=>{
+          const x = pad.l + i*step;
+          const y = pad.t + ch*(1-v/maxV);
+          i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+        });
+        ctx.strokeStyle=this.color;ctx.lineWidth=1.5;ctx.stroke();
+
+        // Latest dot
+        const lastIdx = d.length-1;
+        const lx = pad.l+lastIdx*step;
+        const ly = pad.t+ch*(1-d[lastIdx]/maxV);
+        ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);
+        ctx.fillStyle=this.color;ctx.fill();
+      }
+    };
+  }
+
+  function colorStr(cssVar){
+    const map = {
+      '--gold':'rgb(201,150,58)',
+      '--teal':'rgb(2,195,154)',
+      '--violet':'rgb(167,139,250)',
+      '--coral':'rgb(255,107,74)',
+    };
+    return map[cssVar]||'rgb(200,200,200)';
+  }
+
+  charts.tps   = makeChart('chart-tps',  'TPS',    colorStr('--gold'),   true,  v=>fmtTPS(v));
+  charts.gmv   = makeChart('chart-gmv',  'GMV',    colorStr('--teal'),   true,  v=>fmt(v));
+  charts.pool  = makeChart('chart-pool', 'Pool',   colorStr('--violet'), false, v=>fmt(v));
+  charts.mix   = null; // special bar chart
+}
+
+function drawMixChart(){
+  const el = document.getElementById('chart-mix');
+  const w = el.parentElement.offsetWidth;
+  const h = el.parentElement.offsetHeight;
+  el.width = w * devicePixelRatio;
+  el.height = h * devicePixelRatio;
+  el.style.width = w+'px';
+  el.style.height = h+'px';
+  const ctx = el.getContext('2d');
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  ctx.clearRect(0,0,w,h);
+
+  const total = chartData.buy + chartData.redeem + chartData.reward;
+  if(total === 0) return;
+
+  const cats = [
+    {label:'B2B Buy',    val:chartData.buy,    color:'rgb(201,150,58)'},
+    {label:'B2B Redeem', val:chartData.redeem, color:'rgb(2,195,154)'},
+    {label:'Reward',     val:chartData.reward,  color:'rgb(167,139,250)'},
+  ];
+
+  const pad = {l:10,r:10,t:10,b:30};
+  const cw = w - pad.l - pad.r;
+  const ch = h - pad.t - pad.b;
+  const bw = cw/cats.length - 8;
+  const maxV = Math.max(...cats.map(c=>c.val),1);
+
+  cats.forEach((c,i)=>{
+    const bh = (c.val/maxV)*ch;
+    const x = pad.l + i*(bw+8);
+    const y = pad.t + ch - bh;
+
+    const grad = ctx.createLinearGradient(0,y,0,pad.t+ch);
+    grad.addColorStop(0,c.color);
+    grad.addColorStop(1,c.color.replace('rgb','rgba').replace(')',', .3)'));
+
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x,y,bw,bh,3) : ctx.rect(x,y,bw,bh);
+    ctx.fillStyle=grad;ctx.fill();
+
+    // Value label
+    ctx.fillStyle='rgba(220,230,240,.8)';
+    ctx.font=`600 9px 'JetBrains Mono'`;
+    ctx.textAlign='center';
+    ctx.fillText(fmtN(c.val),x+bw/2,y-4);
+
+    // Bottom label
+    ctx.fillStyle='rgba(100,115,130,.8)';
+    ctx.font=`8px 'Space Mono'`;
+    ctx.fillText(c.label,x+bw/2,h-pad.b+12);
+
+    // Pct
+    const pct = total>0?((c.val/total)*100).toFixed(1):'0.0';
+    ctx.fillStyle='rgba(180,190,210,.6)';
+    ctx.font=`8px 'JetBrains Mono'`;
+    ctx.fillText(pct+'%',x+bw/2,h-pad.b+22);
+  });
+}
+
+function pushChart(key, val){
+  chartData[key].push(val);
+  if(chartData[key].length > CHART_POINTS) chartData[key].shift();
+}
+
+function redrawCharts(){
+  charts.tps  && charts.tps.draw();
+  charts.gmv  && charts.gmv.draw();
+  charts.pool && charts.pool.draw();
+  drawMixChart();
+}
+
+// ── JURISDICTION SIDEBAR ──
+function renderJuris(){
+  if(!S) return;
+  const total = Object.values(S.escrow).reduce((a,b)=>a+b,0)||1;
+  document.getElementById('juris-list').innerHTML = CURRENCIES.map(c=>{
+    const bal = S.escrow[c];
+    const usd = bal * FX[c];
+    const pct = Math.min((usd/total)*100,100);
+    return `<div class="juris-row">
+      <span class="jr-flag">${FLAGS[c]}</span>
+      <span class="jr-cur">${c}</span>
+      <div class="jr-bar-wrap"><div class="jr-bar" style="width:${pct}%"></div></div>
+      <span class="jr-val">${fmt(usd)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── PROCESS A BATCH OF TRANSACTIONS ──
+function processBatch(batchTx, batchSimSecs){
+  const mr = S.mixRatios;
+  const txSz = S.txSize;
+
+  // Distribute transactions across types
+  const n_b2b_buy  = Math.round(batchTx * mr.b2b_buy);
+  const n_b2b_red  = Math.round(batchTx * mr.b2b_red);
+  const n_con_buy  = Math.round(batchTx * mr.con_buy);
+  const n_reward   = Math.round(batchTx * mr.reward);
+
+  // B2B Buys — random currencies, random size around txSz
+  const b2b_buy_vol = n_b2b_buy * txSz * randRange(0.5, 2.0);
+  const b2b_buy_fee = b2b_buy_vol * BUY_FEE;
+  const b2b_buy_esc = b2b_buy_vol - b2b_buy_fee;
+  const b2b_buy_toks = Math.floor(b2b_buy_esc / BASE_PRICE);
+
+  // B2B Redeems (vendor settlements)
+  const b2b_red_vol = n_b2b_red * txSz * randRange(0.5, 1.8);
+  const b2b_red_fee = b2b_red_vol * SELL_FEE;
+  const b2b_red_toks = Math.floor(b2b_red_vol / BASE_PRICE);
+
+  // Consumer buys
+  const con_buy_vol = n_con_buy * txSz * randRange(0.1, 0.5);
+  const con_buy_fee = con_buy_vol * BUY_FEE;
+  const con_buy_esc = con_buy_vol - con_buy_fee;
+  const con_buy_toks = Math.floor(con_buy_esc / BASE_PRICE);
+
+  // Reward distributions ($83.33 each from ad revenue)
+  const reward_vol = n_reward * REWARD_AMT;
+  const reward_fee = reward_vol * BUY_FEE;
+  const reward_esc = reward_vol - reward_fee;
+  const reward_toks = n_reward * REWARD_TOKS;
+
+  // Total
+  const totalFiat = b2b_buy_vol + con_buy_vol + reward_vol;
+  const totalFees = b2b_buy_fee + b2b_red_fee + con_buy_fee + reward_fee;
+  const totalEscAdd = b2b_buy_esc + con_buy_esc + reward_esc;
+  const totalEscRel = b2b_red_vol * (1 - SELL_FEE);
+  const tokensAdded = b2b_buy_toks + con_buy_toks + reward_toks;
+  const tokensRemoved = Math.min(b2b_red_toks, S.tokensCirculating + tokensAdded);
+
+  // Distribute escrow across currencies
+  CURRENCIES.forEach(c => {
+    const sh = CUR_SHARE[c];
+    S.escrow[c] += totalEscAdd * sh / FX[c];
+    S.escrow[c] -= totalEscRel * sh / FX[c];
+    if(S.escrow[c] < 0) S.escrow[c] = 0;
+  });
+
+  S.pool          += totalFees;
+  S.buyFees       += b2b_buy_fee + con_buy_fee + reward_fee;
+  S.sellFees      += b2b_red_fee;
+  S.adRevenue     += reward_vol;
+  S.gmv           += totalFiat + b2b_red_vol;
+  S.txCount       += batchTx;
+  S.tokensCirculating = Math.max(0, Math.min(
+    S.tokensCirculating + tokensAdded - tokensRemoved,
+    CIRC_CAP
+  ));
+  S.tokensTxd     += tokensAdded + tokensRemoved;
+  S.simElapsed    += batchSimSecs;
+
+  // Chart data updates
+  chartData.buy    += n_b2b_buy + n_con_buy;
+  chartData.redeem += n_b2b_red;
+  chartData.reward += n_reward;
+
+  return {
+    batchTx, n_b2b_buy, n_b2b_red, n_reward,
+    b2b_buy_vol, b2b_red_vol, reward_vol,
+    totalFees, tokensAdded, tokensRemoved,
+  };
+}
+
+// ── ADD FEED ITEM ──
+function addFeedItem(r){
+  const feed = document.getElementById('feed-list');
+  const ph = feed.querySelector('div[style*="text-align:center"]');
+  if(ph) ph.remove();
+
+  batchCount++;
+  feedItems++;
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  item.innerHTML = `
+    <div class="fi-header">
+      <span class="fi-type fi-batch">BATCH #${batchCount}</span>
+      <span class="fi-time">${nowStr()}</span>
+    </div>
+    <div class="fi-desc">${fmtN(r.batchTx)} txs processed · B2B: ${fmtN(r.n_b2b_buy)} buys / ${fmtN(r.n_b2b_red)} redeems · Rewards: ${fmtN(r.n_reward)}</div>
+    <div class="fi-val c-gold">${fmt(r.b2b_buy_vol + r.b2b_red_vol + r.reward_vol)} GMV · Fees: ${fmt(r.totalFees)}</div>
+  `;
+  feed.insertBefore(item, feed.firstChild);
+  // Cap feed at 30 items
+  while(feed.children.length > 30) feed.removeChild(feed.lastChild);
+  document.getElementById('feed-badge').textContent = fmtN(batchCount) + ' batches';
+}
+
+// ── UPDATE ALL UI ──
+function updateUI(currentTPS){
+  if(!S) return;
+
+  const pct = S.txCount / TARGET_TX;
+  const timePct = S.simElapsed / DAY_SECS;
+  const escrow = Object.entries(S.escrow).reduce((a,[c,v])=>a+v*FX[c],0);
+  const liability = S.tokensCirculating * BASE_PRICE;
+  const coverage = liability > 0 ? Math.min(escrow/liability*100,100) : 100;
+  const totalFees = S.buyFees + S.sellFees;
+
+  // Day progress
+  document.getElementById('bc-txcount').textContent = fmtN(S.txCount);
+  document.getElementById('bc-pct').textContent = (pct*100).toFixed(4) + '% of 480B target';
+  document.getElementById('day-pct').textContent = (pct*100).toFixed(3) + '%';
+  document.getElementById('bar-day').style.width = Math.min(pct*100,100) + '%';
+  document.getElementById('sim-time-val').textContent = simTimeStr(S.simElapsed);
+  document.getElementById('bar-simtime').style.width = Math.min(timePct*100,100) + '%';
+
+  // Token economy
+  const circPct = S.tokensCirculating / CIRC_CAP * 100;
+  document.getElementById('sb-circ-val').textContent = fmtN(S.tokensCirculating);
+  document.getElementById('sb-circ-bar').style.width = Math.min(circPct,100) + '%';
+  document.getElementById('sb-liability').textContent = fmt(liability);
+  document.getElementById('sb-tokens-txd').textContent = fmtN(S.tokensTxd);
+  document.getElementById('sb-avg-tokens').textContent = S.txCount>0?fmtN(S.tokensTxd/S.txCount):'0';
+
+  // Escrow & pool
+  document.getElementById('sb-escrow').textContent = fmt(escrow);
+  document.getElementById('sb-coverage').textContent = coverage.toFixed(2)+'%';
+  document.getElementById('sb-pool').textContent = fmt(S.pool);
+  document.getElementById('sb-buy-fees').textContent = fmt(S.buyFees);
+  document.getElementById('sb-sell-fees').textContent = fmt(S.sellFees);
+  document.getElementById('sb-total-fees').textContent = fmt(totalFees);
+  document.getElementById('sb-ad-rev').textContent = fmt(S.adRevenue);
+
+  // Users
+  document.getElementById('sb-b2b').textContent = fmtN(S.users.b2b);
+  document.getElementById('sb-reward').textContent = fmtN(S.users.reward);
+  document.getElementById('sb-external').textContent = fmtN(S.users.external);
+  document.getElementById('sb-total-users').textContent = fmtN(S.users.b2b+S.users.reward+S.users.external);
+
+  // Stats bar
+  document.getElementById('stat-tps').textContent = fmtTPS(currentTPS||0);
+  document.getElementById('stat-gmv').textContent = fmt(S.gmv);
+  document.getElementById('stat-fees').textContent = fmt(totalFees);
+  document.getElementById('stat-escrow').textContent = fmt(escrow);
+  document.getElementById('stat-users').textContent = fmtN(S.users.b2b+S.users.reward+S.users.external);
+  document.getElementById('stat-coverage').textContent = coverage.toFixed(1)+'%';
+  const elapsed = startReal ? ((Date.now()-startReal)/1000) : 0;
+  document.getElementById('stat-elapsed').textContent = elapsed<60?elapsed.toFixed(0)+'s':(elapsed/60).toFixed(1)+'m';
+  document.getElementById('tps-live').textContent = 'TPS: '+fmtTPS(currentTPS||0);
+  document.getElementById('cur-tps').textContent = fmtTPS(currentTPS||0)+' TPS';
+  document.getElementById('cur-gmv').textContent = fmt(S.gmv);
+  document.getElementById('cur-pool').textContent = fmt(S.pool);
+  document.getElementById('cur-mix').textContent =
+    fmtN(chartData.buy)+' / '+fmtN(chartData.redeem)+' / '+fmtN(chartData.reward);
+
+  renderJuris();
+  redrawCharts();
+}
+
+// ── SIMULATION LOOP ──
+let lastChartUpdate = 0;
+let accTx = 0;
+let accSecs = 0;
+
+function simStep(){
+  if(!S || !S.simRunning) return;
+
+  const now = performance.now();
+  const realDt = Math.min((now - S.lastTick) / 1000, 0.1); // max 100ms
+  S.lastTick = now;
+
+  // Simulated seconds this real tick
+  const simDt = realDt * S.speed;
+  // Transactions this tick
+  const txThisTick = Math.round(S.txPerSecSim * simDt);
+
+  if(txThisTick > 0){
+    const result = processBatch(txThisTick, simDt);
+    accTx += txThisTick;
+    accSecs += realDt;
+
+    // Current TPS (simulated)
+    const currentTPS = txThisTick / realDt;
+    if(currentTPS > S.peakTPS) S.peakTPS = currentTPS;
+
+    // Push chart every ~0.5 real seconds
+    if(now - lastChartUpdate > 500){
+      pushChart('tps', currentTPS);
+      pushChart('gmv', S.gmv);
+      const escrow = Object.entries(S.escrow).reduce((a,[c,v])=>a+v*FX[c],0);
+      pushChart('pool', S.pool);
+      chartData.escrow.push(escrow);
+      if(chartData.escrow.length > CHART_POINTS) chartData.escrow.shift();
+      lastChartUpdate = now;
+    }
+
+    // Add feed item every ~1s real time or every large batch
+    if(accSecs >= 1.0 || accTx >= TARGET_TX * 0.01){
+      addFeedItem(result);
+      accSecs = 0;
+      accTx = 0;
+    }
+
+    updateUI(currentTPS);
+  }
+
+  // Check completion
+  if(S.txCount >= TARGET_TX || S.simElapsed >= DAY_SECS){
+    completeSim();
+    return;
+  }
+
+  rafId = requestAnimationFrame(simStep);
+}
+
+// ── CONTROLS ──
+function startSim(){
+  if(S && S.simRunning) return;
+  if(!S) S = initState();
+
+  S.simRunning = true;
+  S.lastTick = performance.now();
+  startReal = startReal || Date.now();
+
+  document.getElementById('sim-dot').className = 'sim-dot running';
+  document.getElementById('sim-label').textContent = 'Running';
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-pause').disabled = false;
+  initCharts();
+  rafId = requestAnimationFrame(simStep);
+}
+
+function pauseSim(){
+  if(!S) return;
+  S.simRunning = !S.simRunning;
+  if(S.simRunning){
+    S.lastTick = performance.now();
+    document.getElementById('sim-dot').className = 'sim-dot running';
+    document.getElementById('sim-label').textContent = 'Running';
+    document.getElementById('btn-pause').textContent = '⏸ Pause';
+    rafId = requestAnimationFrame(simStep);
+  } else {
+    document.getElementById('sim-dot').className = 'sim-dot paused';
+    document.getElementById('sim-label').textContent = 'Paused';
+    document.getElementById('btn-pause').textContent = '▶ Resume';
+    if(rafId) cancelAnimationFrame(rafId);
+  }
+}
+
+function resetSim(){
+  if(rafId) cancelAnimationFrame(rafId);
+  S = null;
+  startReal = null;
+  batchCount = 0;
+  feedItems = 0;
+  lastChartUpdate = 0;
+  accTx = 0;
+  accSecs = 0;
+  chartData = {
+    tps:   Array(CHART_POINTS).fill(0),
+    gmv:   Array(CHART_POINTS).fill(0),
+    pool:  Array(CHART_POINTS).fill(5_000_000),
+    escrow:Array(CHART_POINTS).fill(5_000_000),
+    buy:0, redeem:0, reward:0,
+  };
+  document.getElementById('sim-dot').className = 'sim-dot';
+  document.getElementById('sim-label').textContent = 'Ready';
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+  document.getElementById('btn-pause').textContent = '⏸ Pause';
+  document.getElementById('tps-live').textContent = 'TPS: —';
+  document.getElementById('feed-list').innerHTML = `<div style="padding:24px 14px;text-align:center;color:var(--text3)"><div style="font-size:20px;margin-bottom:8px">◈</div><div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase">Awaiting Simulation</div><div style="font-size:10px;margin-top:8px;line-height:1.6">Configure parameters above and press Run.</div></div>`;
+  document.getElementById('feed-badge').textContent = '0 batches';
+  document.getElementById('bc-txcount').textContent = '0';
+  document.getElementById('bc-pct').textContent = '0.0000% of 480B target';
+  document.getElementById('bar-day').style.width = '0%';
+  document.getElementById('bar-simtime').style.width = '0%';
+  document.getElementById('sim-time-val').textContent = '00:00:00';
+  renderJuris();
+  initCharts();
+  redrawCharts();
+}
+
+function completeSim(){
+  S.simRunning = false;
+  if(rafId) cancelAnimationFrame(rafId);
+  document.getElementById('sim-dot').className = 'sim-dot complete';
+  document.getElementById('sim-label').textContent = 'Complete';
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+
+  const escrow = Object.entries(S.escrow).reduce((a,[c,v])=>a+v*FX[c],0);
+  const liability = S.tokensCirculating * BASE_PRICE;
+  const coverage = liability > 0 ? Math.min(escrow/liability*100,100) : 100;
+  const totalFees = S.buyFees + S.sellFees;
+  const elapsed = startReal ? (Date.now()-startReal)/1000 : 1;
+
+  // Fill results
+  document.getElementById('res-txcount').textContent = fmtN(S.txCount);
+  document.getElementById('res-gmv').textContent = fmt(S.gmv);
+  document.getElementById('res-fees').textContent = fmt(totalFees);
+  document.getElementById('res-escrow').textContent = fmt(escrow);
+  document.getElementById('res-pool').textContent = fmt(S.pool);
+  document.getElementById('res-users').textContent = fmtN(S.users.b2b+S.users.reward+S.users.external);
+  document.getElementById('res-tps').textContent = fmtTPS(S.peakTPS);
+  document.getElementById('res-annfee').textContent = fmt(totalFees * 365);
+  document.getElementById('res-coverage').textContent = coverage.toFixed(2)+'%';
+
+  document.getElementById('completeOverlay').className = 'complete-overlay show';
+}
+
+function closeResults(){
+  document.getElementById('completeOverlay').className = 'complete-overlay';
+}
+
+// ── CLOCK ──
+function updateClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    String(d.getUTCHours()).padStart(2,'0')+':'+
+    String(d.getUTCMinutes()).padStart(2,'0')+':'+
+    String(d.getUTCSeconds()).padStart(2,'0')+' UTC';
+}
+setInterval(updateClock,1000);
+updateClock();
+
+// ── INIT ──
+window.addEventListener('load',()=>{
+  initCharts();
+  redrawCharts();
+  renderJuris();
+});
+window.addEventListener('resize',()=>{ if(charts.tps) redrawCharts(); });
+</script>
+</body>
+</html>
